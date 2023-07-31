@@ -1,0 +1,34 @@
+{
+    "configurations": {
+        {
+            "name": "Win32",
+            "includePath": {
+                "${default}",
+                "C:\\Users\\Lenovo\\Documents\\pico-Projects\\**",
+                "C:\\\\Program Files\\\\Raspberry Pi\\\\Pico SDK v1.5.1\\\\pico-sdk",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_timer/include/hardware",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/boards/include/boards",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2040/hardware_structs/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_base/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2040/hardware_regs/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_timer/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_pwm/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_adc/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_gpio/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/common/pico_stdlib/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_irq/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/pico_stdio/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/common/pico_time/include",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/host/hardware_uart/include"
+            },
+            "defines": {
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            },
+            "windowsSdkVersion": "10.0.22000.0",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    },
+    "version": 4
+}

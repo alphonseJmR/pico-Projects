@@ -1,36 +1,30 @@
-#define NRF24_CE_PORT GPIOG
-#define NRF24_CE_PIN GPIO_PIN_22
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "nrf24L01/nrf24l01.h"
+//  Macros for SPI, CE, and CSN pin configuration.
+#define MISO_PIN 16
+#define NRF24_CSN 17
+#define SCK_PIN 18
+#define MOSI_PIN 19
+#define SS_PIN 20
+#define NRF24_CE 21
 
-#define NRF24_CSN_PORT GPIOG
-#define NRF24_CSN_PIN GPIO_PIN_22
-
-#
-TX GPIO
-
-void CS_Select (void)
+void delay_function(uint32_t duration_ms)
 {
-    HAL_GPIO_WritePin(NRF24_CSN_PORT, NRF24_CSN_PIN, GPIO_PIN_RESET);
+    sleep_ms(duration_ms);
 }
 
-void CS_UnSelect (void)
+void SPI_Initializer()
 {
-    HAL_GPIO_WritePin(NRF24_CSN_PORT, NRF24_CSN_PIN, GPIO_PIN_SET);
-}
+    gpio_init(MOSI_PIN);
+    gpio_set_dir(MOSI_PIN, GPIO_OUT);
 
-void CE_Select (void) 
-{
-    HAL_GPIO_WritePin(NRF24_CE_PORT, NRF24_CE_PIN, GPIO_PIN_SET);
-}
+    gpio_init(MISO_PIN);
+    gpio_set_dir(MISO_PIN, GPIO_IN);
 
-void CE_Select (void) 
-{
-    HAL_GPIO_WritePin(NRF24_CE_PORT, NRF24_CE_PIN, GPIO_PIN_RESET);
-}
+    gpio_init(SCK_PIN);
+    gpio_set_dir(SCK_PIN, GPIO_OUT);
 
-void nrf24_WriteReg (uint8_t Reg, uint_t Data) 
-{
-    uint_t buf[2];
-    buf[0] = Reg|1<<5;
-
-    //  Pull the CS
+    gpio_init(SS_PIN);
+    gpio_set_dir(SS_PIN, GPIO_OUT);
 }

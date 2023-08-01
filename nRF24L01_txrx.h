@@ -27,4 +27,43 @@ void SPI_Initializer()
 
     gpio_init(SS_PIN);
     gpio_set_dir(SS_PIN, GPIO_OUT);
+
+    SPCR = 0X51;
+}
+
+void pinout_Initializer() 
+{
+    gpio_init(NRF24_CSN);
+    gpio_set_dir(NRF24_CSN, GPIO_OUT);
+    gpio_init(NRF24_CE);
+    gpio_set_dir(NRF24_CE, GPIO_OUT);
+
+    gpio_put(NRF24_CSN, 0);
+    gpio_pull_high(NRF24_CE);
+}
+
+void nrf24_SPI(uint8_t input)
+{
+    if (input == SPI_ON) {
+        gpio_put(NRF24_CSN, 0);
+    }else {
+        gpio_put(NRF24_CSN, 1);
+    }
+}
+
+// 1 byte SPI shift register send and receive routine
+uint8_t SPI_send_command(uint8_t command)
+{
+    SPDR = command;
+    while ((SPSR & (1 << SPIF)) == 0) {}
+    return SPDR;
+}
+
+void nrf24_CE(uint8_t input)
+{
+    if (input == CE_ON) {
+        gpio_put(NRF24_CE, 1);
+    } else {
+        gpio_put(NRF24_CE, 0);
+    }
 }

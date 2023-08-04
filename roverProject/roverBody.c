@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
@@ -51,6 +52,60 @@ gpio_put(buzzer, 0);
 }
 
 */
+
+typedef struct chan_level_data {
+    
+    uint8_t chan_one;
+    uint8_t chan_two;
+    uint8_t chan_three;
+    uint8_t chan_four;
+    uint8_t chan_five;
+    uint8_t chan_six;
+    uint8_t chan_seven;
+
+} chan_level_data;
+  chan_level_data Data_Send;
+
+const channel_data_input() {
+
+    int ii = 0;
+    while(ii < 7){
+        switch(ii) {
+            case 0:
+                Data_Send.chan_one = 0; // Enter By Function
+                break;
+            case 1:
+                Data_Send.chan_two = 0; // " "
+                break;
+            case 2:
+                Data_Send.chan_three = 0; // " "
+                break;
+            case 3:
+                Data_Send.chan_four = 0; // " "
+                break;
+            case 4:
+                Data_Send.chan_five = 0; // " "
+                break;
+            case 5:
+                Data_Send.chan_six = 0; // " "
+                break;
+            case 6:
+                Data_Send.chan_seven = 0; // " "
+                break;
+            default:
+                printf("Packet Error: Channel greater than set channels.\n");
+                break;
+        }
+        ii++;
+    }
+
+
+}
+
+const radio_packet() {
+    Data_Send.chan_one = channel_data_input();
+    Data_Send.chan_two = channel_data_input();
+}
 
 int main() {
     stdio_init_all();

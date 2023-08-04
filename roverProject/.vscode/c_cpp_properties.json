@@ -6,6 +6,7 @@
                 "${default}",
                 "C:\\Users\\Lenovo\\Documents\\pico-Projects\\**",
                 "C:\\\\Program Files\\\\Raspberry Pi\\\\Pico SDK v1.5.1\\\\pico-sdk",
+                "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico",
                 "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2_common/hardware_timer/include/hardware",
                 "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/boards/include/boards",
                 "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/src/rp2040/hardware_structs/include",

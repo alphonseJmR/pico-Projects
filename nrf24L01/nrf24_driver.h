@@ -20,11 +20,10 @@
 #define NRF24L01_H
 
 #include "error_manager.h"
-#include "hardware/spi.h"
-
+#include "/home/alphonse/pico-sdk/src/rp2_common/hardware_spi/include/hardware/spi.h"
 
 // SETUP_AW register address width (AW) settings
-typedef enum address_width
+typedef enum address_width_e
 {
   AW_3_BYTES = 1, // 3 Byte address width
   AW_4_BYTES = 2, // 4 Byte address width

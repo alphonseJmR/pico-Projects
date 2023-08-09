@@ -47,9 +47,9 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 void rgb_color() {
 
-    rgbColors.r = (analog.result / analog.speed_multiplier);
-    rgbColors.g = (analog.result / analog.speed_multiplier);
-    rgbColors.b = (analog.result / analog.speed_multiplier);
+    rgbColors.r = (analog.result / (analog.speed_multiplier* 10));
+    rgbColors.g = (analog.result / (analog.speed_multiplier * 10));
+    rgbColors.b = (analog.result / (analog.speed_multiplier * 10));
 
 }
 
@@ -86,7 +86,7 @@ void button_press() {
         button_pressed = 0;
     }
     button_pressed++;
-
+    analog.speed_multiplier = button_pressed;
 }
 
 void button_callback(uint gpio, uint32_t events) {
@@ -96,6 +96,7 @@ void button_callback(uint gpio, uint32_t events) {
         if(gpio_get(anal_speed) != 1) {
 
             button_presses = true;
+            button_press();
 
         }else {
 
@@ -112,9 +113,6 @@ void pwm_init_pin(uint8_t pin) {
 
 int main () {
 
-    time_t t;
-    srand((unsigned) time(&t));
-
    stdio_init_all();
 
     adc_init();
@@ -123,18 +121,20 @@ int main () {
     adc_gpio_init(28);
     adc_select_input(2);
 
-    pwm_init_pin(motor_drive);
-        uint slice_num[0] = pwm_gpio_to_slice_num(motor_drive);
-    pwm_init_pin(motor_reverse);
-        uint slice_num[1] = pwm_gpio_to_slice_num(motor_reverse);
-    pwm_init_pin(rgb_r);
-        uint slice_num[2] = pwm_gpio_to_slice_num(rgb_r);
-    pwm_init_pin(rgb_g);
-        uint slice_num[3] = pwm_gpio_to_slice_num(rgb_g);
-    pwm_init_pin(rgb_b);
-        uint slice_num[4] = pwm_gpio_to_slice_num(rgb_b);
+    uint slice_num[1];
 
-    for(int a = 0; a < 5; a++) {
+    pwm_init_pin(motor_drive);
+        uint slice_num[1] = pwm_gpio_to_slice_num(motor_drive);
+    pwm_init_pin(motor_reverse);
+        uint slice_num[2] = pwm_gpio_to_slice_num(motor_reverse);
+    pwm_init_pin(rgb_r);
+        uint slice_num[3] = pwm_gpio_to_slice_num(rgb_r);
+    pwm_init_pin(rgb_g);
+        uint slice_num[4] = pwm_gpio_to_slice_num(rgb_g);
+    pwm_init_pin(rgb_b);
+        uint slice_num[5] = pwm_gpio_to_slice_num(rgb_b);
+
+    for(int a = 0; a < 6; a++) {
 
         pwm_set_wrap(slice_num[a], 4095);
         pwm_init(slice_num[a], 0, true);
@@ -152,11 +152,11 @@ while(1){
             while(analog.vertical != 0) {
 
                 if(analog.vertical > 0){
-                    pwm_set_chan_level(slice_num, PWM_CHAN_A, analog.vert_pwm);
+                    pwm_set_chan_level(slice_num[1], PWM_CHAN_A, analog.vert_pwm);
                     printf("Driving forward.\n");
                     printf("Pin number 10 firing confirmation.");
                 }else if(analog.vertical < 0) {
-                    pwm_set_chan_level(slice_num, PWM_CHAN_A, analog.vert_pwm);
+                    pwm_set_chan_level(slice_num[2], PWM_CHAN_A, analog.vert_pwm);
                     printf("Reversing.\n");
                     printf("Pin number 11 firing confirmation.");
                 }
@@ -165,7 +165,14 @@ while(1){
                   
         }else {}
 
-    
+        for(let b = 0; b < 3; b++) {
+
+            pwm_set_chan_level(slice_num[3], PWM_CHAN_A, rgbColors.r);
+            pwm_set_chan_level(slice_num[4], PWM_CHAN_A, rgbColors.g);
+            pwm_set_chan_level(slice_num[5], PWM_CHAN_A, rgbColors.b);
+            printf("RGB Colors are: R- %d, G- %d, B- %d.\n", rgbColors.r, rgbColors.g, rgbColors.b);
+
+        }
 
 
     }

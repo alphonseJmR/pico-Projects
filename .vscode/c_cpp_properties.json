@@ -4,7 +4,7 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "C:\\Program Files\\Raspberry Pi\\Pico SDK v1.5.1/**"
+                "../../pico/**"
             ],
             "defines": [
                 "_DEBUG",

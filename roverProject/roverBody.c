@@ -10,7 +10,6 @@
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
 #include "timer.h"
-#include "nrf24l01.h"
 #include "nrf24_driver.h"
 
 //  Poteniometer pin is ADC pin 26
@@ -110,7 +109,7 @@ void set_Degrees(int pin, float millis) {
 
 void set_servo(int pin, float beginMillis) {
     gpio_set_function(pin, GPIO_FUNC_PWM);
-    uint slice_num = pwm_gpio_to_slice_num(pin);
+    int slice_num = pwm_gpio_to_slice_num(pin);
 
     pwm_config config = pwm_get_default_config();
     pwm_config_set_clkdiv(&config, 64.f);
@@ -207,7 +206,7 @@ int main() {
         .mosi = 11,
         .miso = 12,
         .csn = 13,
-        .sdk = 14,
+        .sck = 14,
         .ce = 15
 
 };
@@ -266,10 +265,12 @@ int main() {
   uint64_t time_reply = 0; // response time after packet sent
 }
  
-    adc_Value adc_three{
-        result;
-        pwm_value;
+  typedef struct adc_three{
+      uint8_t  result;
+      uint8_t pwm_value;
     }adc_three;
+
+    adc_three adcValue;
 
     while(1)
     {
@@ -284,12 +285,12 @@ int main() {
 
                 if(data_read.vertical > 0){
                     adc_call();
-                    pwm_set_chan_level(slice_num, PWM_CHAN_A, adc_three.pwm_value);
+                    pwm_set_chan_level(slice_num, PWM_CHAN_A, adcValue.pwm_value);
                     printf("Driving forward.\n");
                     printf("Pin number 12 firing confirmation.");
                 }else if(data_read.vertical < 0) {
                     adc_call();
-                    pwm_set_chan_level(num_slice, PWM_CHAN_A, adc_three.pwm_value);
+                    pwm_set_chan_level(num_slice, PWM_CHAN_A, adcValue.pwm_value);
                     printf("Reversing.\n");
                     printf("Pin number 13 firing confirmation.");
                 }

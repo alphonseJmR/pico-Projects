@@ -14,4 +14,4 @@ pico_enable_stdio_usb(roverBody 1)
 pico_enable_stdio_uart(roverBody 0)
 pico_add_extra_outputs(roverBody)
 
-target_link_libraries(roverBody pico_stdlib hardware_gpio hardware_adc hardware_timer hardware_pwm hardware_spi)
+target_link_libraries(roverBody pico_stdlib hardware_gpio hardware_adc hardware_timer hardware_pwm hardware_spi nrf24)

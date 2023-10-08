@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "stdlib.h"
-#include "pico.h"
-#include "hardware/adc.h"
-#include "hardware/spi.h"
-#include "hardware/pwm.h"
-#include "hardware/gpio.h"
 #include "nrf24_driver.h"
+/*
+#include "hardware/gpio.h"
+#include "hardware/spi.h"
+*/
+#include "hardware/pwm.h"
+#include "hardware/adc.h"
 
 //  Poteniometer pin is ADC pin 26
 //  Analog stick vertical is 26, and horizontal is 27.

@@ -7,21 +7,26 @@
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
 #include "hardware/irq.h"
+#include "pico/time.h"
 
 #define hall_sensor_one 26      // Set gpio pin for hall effect sensor one.
 
-#define clk 1                   // Rotary encoder pin clk
-#define dt 2                    // Rotary encoder pin dt
-#define rotEnc_button 0         //  Rotary encoder button pin
+#define clk 2                   // Rotary encoder pin clk
+#define dt 4                   // Rotary encoder pin dt
+#define rotary_button 0         //  Rotary encoder button pin
 #define buzzer 3
 
 #define rgb_r 13
 #define rgb_g 14
 #define rgb_b 15
 
-int rgbColor_Select = 0;          //  Current position of rgb led pin output.
-volatile int rotCounter;
+    int freq = 0;
+    bool up = true;
+    bool down = false;
 
+
+int rgbColor_Select = 6;          //  Current position of rgb led pin output.
+volatile int rotCounter;
 
 typedef struct hall_data{
     uint16_t hall_one;              //   Current reading of hall effect sensor 1.  adc port 0
@@ -39,6 +44,7 @@ typedef struct rotValues{
     volatile bool lastDt;
     volatile bool Dt;
     volatile bool Button;
+    uint32_t lastInterruptTime;
     volatile int a;
     volatile int b;
 }rotValues;
@@ -46,14 +52,14 @@ rotValues rot;
 
 // Function declaration area
 long map(long x, long in_min, long in_max, long out_min, long out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 //  Function call to adc pins.  All three can be read from this function, provided they're replaced in the brackets.
 void adc_data_call() {
 
     adc_select_input(0);
     hall.hall_one = adc_read();
-    hall.hall_one_pwm = map(hall.hall_one, 0, 4095, 0, 255);
+    hall.hall_one_pwm = map(hall.hall_one, 4095, 0, 255, 0);
 /*
     adc_select_input(1);
     hall.rot_a_read = adc_read();
@@ -67,42 +73,90 @@ void adc_data_call() {
 }
 
 void color_check(int num) {
-        if(num > 4){
+        if(num > 6){
 
         rgbColor_Select = 0;
     } 
 }
 
 void button_callback(uint gpio, uint32_t events) {
+    uint32_t currentTime = time_us_32();
+    uint32_t timeSinceLastInterrupt = currentTime - rot.lastInterruptTime;
 
-   // printf("Interrupt occured at pin: %i, with events: %i.\n\n", gpio, events);
-    if(gpio == rotEnc_button){
+    if(gpio == rotary_button){
      //   printf("\n\nInterrupt occured at Button.\n\n");
-        rot.Button = true;
-        gpio_acknowledge_irq(gpio, events);
+        rot.Button = true;  
     }
-    if(gpio == clk){
-       // printf("\n\nInterrupt occured at CLK pin.\n\n");
+
+    //  The > # is the debounce threshold.  It is measured in uS.
+    //  8/20 previous interrupt time set as: 300.  Current best time:  250:
+    if (timeSinceLastInterrupt > 205) {
+        rot.lastInterruptTime = currentTime;
+        gpio_acknowledge_irq(gpio, events);
+
+    if(gpio == clk) {
         rot.Clk = gpio_get(clk);
-        gpio_acknowledge_irq(gpio, events);
-        rot.a++;
-    }
-    if(gpio == dt){
-      //  printf("\n\nInterrupt occured at DT pin.\n\n");
         rot.Dt = gpio_get(dt);
-        gpio_acknowledge_irq(gpio, events);
-        rot.b++;
+        if(!rot.Clk && rot.Dt){
+            if(rot.Clk != rot.lastClk){
+                rot.a++;
+                if(rotCounter < 8) {
+                    rotCounter++;
+                }else {
+                    printf("At maximum value.\n\n");
+                }
+            }
+        }else {
+        if(rot.Dt != rot.lastDt){
+            if(rot.Dt && rot.Clk){
+                rot.b++;
+                if(rotCounter != 0){
+                    rotCounter--;
+                }else {
+                    printf("At minimum value.\n\n");
+                }
+            }
+        }
+        }
+        rot.lastClk = rot.Clk;
+        rot.lastDt = rot.Dt;
+    }
+  
     }
 }
 
+
+void freq_sweep(){
+    
+    if(up == true){
+        //  Maximum value for ping-pong effect is set at < x value.
+        if(freq < 255){
+        freq++;
+        up = true;
+        }else{
+            up = false;
+        }
+    }else {
+        down = true;
+        //  `Minimum value for the ping-pong effect is set as != x value.
+        if(freq != 0){
+            freq--;
+        }else {
+            up = true;
+        }
+    }
+
+}
+
+ 
 int main () {
 
    stdio_init_all();
 
     adc_init();
     adc_gpio_init(26);
-    adc_gpio_init(27);
-    adc_gpio_init(28);
+   // adc_gpio_init(27);
+   // adc_gpio_init(28);
 
     uint slice_num[1];
 
@@ -134,70 +188,43 @@ int main () {
                 pwm_set_chan_level(slice_num[4], PWM_CHAN_A, 0);
                 pwm_set_enabled(slice_num[4], true);
 
-        gpio_init(rotEnc_button);
-            gpio_set_dir(rotEnc_button, GPIO_IN);
-            gpio_pull_down(rotEnc_button);
+
+        gpio_init(rotary_button);
+            gpio_set_dir(rotary_button, GPIO_IN);
+            gpio_pull_up(rotary_button);
 
         gpio_init(clk);
             gpio_set_dir(clk, GPIO_IN);
-          //  gpio_pull_up(clk);
+            gpio_pull_up(clk);
 
         gpio_init(dt);
             gpio_set_dir(dt, GPIO_IN);
-          //   gpio_pull_down(dt);
+            gpio_pull_up(dt);
 
 
-    gpio_set_irq_enabled_with_callback(rotEnc_button, 0x04 | 0x08, true, &button_callback);
-    gpio_set_irq_enabled_with_callback(clk, 0x04 | 0x08, true, &button_callback);
-    gpio_set_irq_enabled_with_callback(dt, 0x04 | 0x08, true, &button_callback);
+    gpio_set_irq_enabled_with_callback(rotary_button, 0x04 | 0x08, true, &button_callback);
+    gpio_set_irq_enabled_with_callback(clk, 0x08 | 0x04, true, &button_callback);
+    gpio_set_irq_enabled_with_callback(dt, 0x08 | 0x04, true, &button_callback);
 
-    rot.lastClk = gpio_get(clk);
+    rot.Clk = false;
+    rot.lastClk = false;
 
 while(1){
-
-    rot.Clk = gpio_get(clk);
 
     adc_data_call();
 
     if(rot.Button == true) {
         rgbColor_Select++;
         rot.Button = false;
-    }else {
-       // printf("\n\nNo change to color selection.\n\n");
     }
-
-    if(rot.Clk != rot.lastClk) {
-        if(gpio_get(dt)!= rot.Clk){
-            printf("Rotating clockwise.\n");
-            if(rotCounter < 255){
-                rotCounter++;
-                printf("Counter Incremented?\n\n");
-            }else {
-                printf("\nAt maximum rotation value.\n\n");
-            }
-            
-        }else {
-            printf("Rotating counter clockwise.\n");
-            if(rotCounter > 0){
-                rotCounter--;
-                printf("Counter Decremented?\n\n");
-            }else  {
-                printf("\nAt minimum rotation value.\n\n");
-            }
-
-        } 
-        rot.lastClk = rot.Clk;
-        rot.Dt = gpio_get(dt);
-    }
-
-    printf("Hall sensor one is currently at: %ld.\n", hall.hall_one_pwm);
-    printf("Clk: %d. Dt: %d. lastClk: %d. lastDt: %d.\n\n", rot.Clk, rot.Dt, rot.lastClk, rot.lastDt);
-    printf("clk: %i.  dt: %i.\n\n", gpio_get(clk), gpio_get(dt));
     printf("Rot Counter: %i.\n\n", rotCounter);
     printf("Color Selected: %i.\n", rgbColor_Select);
-    printf("Encode values: %i and %i.\n\n", rot.Clk, rot.lastClk);
-    printf("Rotary interrupt amount: clk: %i, dt: %i.\n\n", rot.a, rot.b);
+    printf("Current photoResistor adc value: %i.\n", hall.hall_one_pwm);
     color_check(rgbColor_Select);
+
+    freq_sweep();
+    printf("\nFrequency of shift_clk pwm signal: %i\n\n", freq);
+    
 
     if(rgbColor_Select == 0) {
         pwm_set_chan_level(slice_num[1], PWM_CHAN_B, hall.hall_one_pwm);
@@ -205,31 +232,38 @@ while(1){
         pwm_set_chan_level(slice_num[3], PWM_CHAN_B, 0);
     }else if(rgbColor_Select == 1) {
         pwm_set_chan_level(slice_num[1], PWM_CHAN_B, 0);
-        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, hall.hall_one_pwm);
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, freq);
         pwm_set_chan_level(slice_num[3], PWM_CHAN_B, rotCounter);
     }else if(rgbColor_Select == 2){
-        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, 0);
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, freq);
         pwm_set_chan_level(slice_num[2], PWM_CHAN_A, rotCounter);
-        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, hall.hall_one_pwm);
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, 0);
     }else if(rgbColor_Select == 3) {
-        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, hall.hall_one_pwm);
-        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, hall.hall_one_pwm);
-        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, rotCounter);
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, rotCounter);
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, 0);
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, freq);
     }else if(rgbColor_Select == 4) {
-        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, 0);
-        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, hall.hall_one_pwm);
-        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, hall.hall_one_pwm);
-        
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, (hall.hall_one_pwm % 15));
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, (hall.hall_one_pwm % 25));
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, (hall.hall_one_pwm % 50));   
+    }else if(rgbColor_Select == 5) {
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, rotCounter);
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, rotCounter);
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, 0);
+    }else if(rgbColor_Select == 6){
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, (freq % 15));
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, (freq % 15));
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, (freq % 15));
     }else {
 
         printf("Error occured within the rotButton function system.\n");
-        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, hall.hall_one_pwm);
-        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, hall.hall_one_pwm);
-        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, hall.hall_one_pwm);
+        pwm_set_chan_level(slice_num[1], PWM_CHAN_B, (hall.hall_one_pwm % 15));
+        pwm_set_chan_level(slice_num[2], PWM_CHAN_A, (hall.hall_one_pwm % 15));
+        pwm_set_chan_level(slice_num[3], PWM_CHAN_B, (hall.hall_one_pwm % 15));
     }
-    pwm_set_chan_level(slice_num[4], PWM_CHAN_A, hall.hall_one_pwm);
-    sleep_ms(hall.hall_one_pwm);
-    
+    pwm_set_chan_level(slice_num[4], PWM_CHAN_A, freq);
+    sleep_ms(100);
+
  }
         
 tight_loop_contents();

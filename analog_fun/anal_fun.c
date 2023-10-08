@@ -26,11 +26,7 @@ typedef struct anal_data{
     long vert_pwm;         // Result of long map conversion of vertical analog data.
     uint16_t horizontal;   // Current reading of horizontal analog stick data.
     long hori_pwm;         // Result of long map conversion on horizontal analog data.
-    uint16_t temp_sensor;  // Current reading of adc port 2
-    long result;           // Result of long map conversion on temp sensor ... or whatever analog fun is connected.
-    int speed_multiplier;  // Button call to increase drive speed.
 } anal_data;
-
 anal_data analog;
 
 typedef struct rgb_data {
@@ -45,13 +41,6 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-void rgb_color() {
-
-    rgbColors.r = (analog.result / (analog.speed_multiplier* 10));
-    rgbColors.g = (analog.result / (analog.speed_multiplier * 10));
-    rgbColors.b = (analog.result / (analog.speed_multiplier * 10));
-
-}
 
 void adc_data_call() {
         for(int d = 0; d < 3; d++){

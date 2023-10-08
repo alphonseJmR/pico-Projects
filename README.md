@@ -75,4 +75,22 @@
     hall_round.c
     CMakeLists.txt
     pico_sdk_import.cmake
-    
+
+
+##DESCRIPTION##
+
+  All folders contain hopefully buildable files for programs in a C SDK for the RP2040 (PI PICO).
+  
+  folders -analog_fun, motor_run, rot_serve, servo_test-
+  These folders were / are my attempts to implement different periphericals for the above MCU.
+
+  rc_controller & rc_receiver, rf_driver & rf_receiver attempt folders were / are my attempt at implementing the NRF24L01 driver from (include code author here)
+
+  spin_me_hall_round was a bit of fun adding together a few of the other different implementations.
+
+  roverproject is unfinished and unorgainized.
+
+
+##Current goals:
+
+  Continue building program for rc_controller & rc_receiver.

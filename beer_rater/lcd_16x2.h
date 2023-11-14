@@ -66,6 +66,7 @@ typedef struct {
 
 static const uint8_t ddram_line1[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
 static const uint8_t ddram_line2[] = {0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F};
+
 static void send_nibble(const LCDPins *pins, uint8_t data) {
 
     // printf("Printing: 0b%04x.\n", data);
@@ -286,7 +287,6 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 void write_display(const LCDPins *pins, char *top, char *bottom, int top_data, int bottom_data){
     
     printf("\n\n\nDisplay Writting function.\n\n");
-    printf("Cycle Count: %d.\n", cycle_count);
 
     gpio_put(pins->rs_pin, 0);
         sleep_ms(5);
@@ -317,7 +317,5 @@ void write_display(const LCDPins *pins, char *top, char *bottom, int top_data, i
         sleep_ms(500);
         
 }
-
-
 
 #endif

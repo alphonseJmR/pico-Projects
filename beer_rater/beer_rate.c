@@ -9,32 +9,6 @@
 #define lcd_backlight_toggle 14
 
 
-void menu_selection(LCDPins *pins, int rotary_value) {
-  switch(rotary_value) {
-    case 0:
-      write_display(pins, t_menu.top_menu_one, t_menu.top_menu_two, 0, 0);
-      break;
-    case 1:
-      write_display(pins, t_menu.top_menu_one, t_menu.top_menu_three, 0, 0);
-      break;
-    case 2:
-      write_display(pins, t_menu.top_menu_one, t_menu.top_menu_four, 0, 0);
-      break;
-    case 3:
-      write_display(pins, t_menu.top_menu_one, t_menu.top_menu_five, 0, 0);
-      break;
-    case 4:
-      write_display(pins, t_menu.top_menu_one, t_menu.top_menu_six, 0, 0);
-      break;
-    default:
-      printf("No menu selection available.\n");
-  }
-}
-
-void in_menu_selection(LCDPins *pins, int rotary_value){
-
-}
-
 int main() {
   // Define the LCD pins struct for your specific configuration
 LCDPins lcd_pins = {
@@ -88,7 +62,6 @@ adc_port_values pico_adc = {
   .button_two_max = NULL,
   .button_three_max = NULL
  };
-
 
     stdio_init_all();
     adc_init();

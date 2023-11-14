@@ -475,30 +475,37 @@ void shift_register_pin_init(register_pins *config){
   if(config->register_one_data != NULL){
     gpio_init(config->register_one_data);
     gpio_set_dir(config->register_one_data, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_data);
   }
   if(config->register_one_latch != NULL){
     gpio_init(config->register_one_latch);
     gpio_set_dir(config->register_one_latch, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_latch);
   }
   if(config->register_one_enable != NULL){
     gpio_init(config->register_one_enable);
     gpio_set_dir(config->register_one_enable, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_enable);
   }
     if(config->register_two_data != NULL){
     gpio_init(config->register_two_data);
     gpio_set_dir(config->register_two_data, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_data);
   }
   if(config->register_two_latch != NULL){
     gpio_init(config->register_two_latch);
     gpio_set_dir(config->register_two_latch, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_latch);
   }
   if(config->register_two_enable != NULL){
     gpio_init(config->register_two_enable);
     gpio_set_dir(config->register_two_enable, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_enable);
   }
   if(config->register_clk_line != NULL){
     gpio_init(config->register_clk_line);
     gpio_set_dir(config->register_clk_line, GPIO_OUT);
+    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_clk_line);
   }
 }
 

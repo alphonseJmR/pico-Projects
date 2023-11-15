@@ -767,7 +767,7 @@ void style_beer_selection(LCDPins *pins, menu_incrementer_values *values, int ro
 
     rotary_value = 0;
   
-  switch() {
+  switch(values->third_menu_value) {
 
     case 0:
       while(!selection){
@@ -1000,7 +1000,7 @@ void style_beer_selection(LCDPins *pins, menu_incrementer_values *values, int ro
       }
     break;
 
-    case 1-:
+    case 10:
       while(!selection){
 
         if(rotary_value == 0){
@@ -1023,9 +1023,58 @@ void style_beer_selection(LCDPins *pins, menu_incrementer_values *values, int ro
         }
       }
     break;
+
+    case 11:
+      while(!selection){
+
+        if(rotary_value == 0){
+        write_display(pins, styles.saisons, saisons.saison_du_buff, 0, 0);
+        }
+        if(rotary_value == 1){
+        write_display(pins, styles.saisons, saisons.prop_culture, 0, 0);
+        }
+        if(rotary_value == 2){
+        write_display(pins, styles.saisons, saisons.saison_83, 0, 0);
+        }
+        if(rotary_value == 3){
+        write_display(pins, styles.saisons, saisons.saison_du_swamp, 0, 0);
+        }
+        if(rotary_value == 4){
+        write_display(pins, styles.saisons, saisons.eukaryote, 0, 0);
+        }
+        if(rotary_value == 5){
+        write_display(pins, styles.saisons, saisons.stone_saison, 0, 0);
+        }
+      }
+    break;
+
+    case 12:
+      while(!selection){
+
+        if(rotary_value == 0){
+        write_display(pins, styles.sour_ales, sour_ales.miami_madness, 0, 0);
+        }
+        if(rotary_value == 1){
+        write_display(pins, styles.sour_ales, sour_ales.supplicaton, 0, 0);
+        }
+        if(rotary_value == 2){
+        write_display(pins, styles.sour_ales, sour_ales.le_terroin, 0, 0);
+        }
+        if(rotary_value == 3){
+        write_display(pins, styles.sour_ales, sour_ales.duck_duck_goose, 0, 0);
+        }
+        if(rotary_value == 4){
+        write_display(pins, styles.sour_ales, sour_ales.amorphia, 0, 0);
+        }
+        if(rotary_value == 5){
+        write_display(pins, styles.sour_ales, sour_ales.rubaeus, 0, 0);
+        }
+      }
+    break;
+
     }
   }
-}
+
 
 
 #endif

@@ -1,8 +1,8 @@
 #include <stdio.h>
+#include "stdlib.h"
 #include "lcd_16x2.h"
 #include "peri_header.h"
 #include "dc_motors.h"
-#include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 

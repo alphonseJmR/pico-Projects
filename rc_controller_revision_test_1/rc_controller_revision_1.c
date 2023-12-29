@@ -2,21 +2,42 @@
 #include "stdlib.h"
 #include "lcd_16x2.h"
 #include "peri_header.h"
+#include "dc_motors.h"
 #include "nrf24_driver.h"
+#include "rc_nrf_configs.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 
-int test_run;
+int rgb_cycle;
+
+char rf_channel[16];
+char rf_data[16];
+char rf_function[16];
+char rf_transmitting[16];
 
   // Define the LCD pins struct for your specific configuration
 LCDPins lcd_pins = {
-    .rs_pin = GPIO_FOUR,        // Replace with the GPIO pin number for RS
-    .e_pin = GPIO_FIVE,         // Replace with the GPIO pin number for E
-    .back_light = GPIO_THREE,   // Replace with the GPIO pin number for LCD backlight.
-    .data4_pin = GPIO_SIX,    // Replace with the GPIO pin number for Data4
-    .data5_pin = GPIO_SEVEN,    // Replace with the GPIO pin number for Data5
-    .data6_pin = GPIO_EIGHT,    // Replace with the GPIO pin number for Data6
-    .data7_pin = GPIO_NINE     // Replace with the GPIO pin number for Data7
+
+    .rs_pin = GPIO_ELEVEN,        // Replace with the GPIO pin number for RS
+    .e_pin = GPIO_TWELVE,         // Replace with the GPIO pin number for E
+    .back_light = GPIO_THIRTEEN,   // Replace with the GPIO pin number for LCD backlight.
+    .data4_pin = GPIO_SEVEN,    // Replace with the GPIO pin number for Data4
+    .data5_pin = GPIO_EIGHT,    // Replace with the GPIO pin number for Data5
+    .data6_pin = GPIO_NINE,    // Replace with the GPIO pin number for Data6
+    .data7_pin = GPIO_TEN     // Replace with the GPIO pin number for Data7
+
+};
+
+register_pins reg_pins = {
+
+  .register_one_data = GPIO_TWENTY,
+  .register_one_latch = GPIO_ONE,
+  .register_one_enable = GPIO_EIGHTEEN,
+  .register_two_data = UNDEFINED,
+  .register_two_latch = UNDEFINED,
+  .register_two_enable = UNDEFINED,
+  .register_clk_line = GPIO_NINETEEN
+
 };
 
 button_types enabled_buttons = {
@@ -40,35 +61,39 @@ adc_port_values pico_adc = {
   .adc0_max_in_map_value = 4095,
   .adc0_min_in_map_value = 0,
   .adc0_min_out_map_value = 0,
-  .adc0_max_out_map_value = 1024,
+  .adc0_max_out_map_value = 255,
   .adc1_max_in_map_value = 4095,
   .adc1_min_in_map_value = 0,
   .adc1_min_out_map_value = 0,
-  .adc1_max_out_map_value = 255,
+  .adc1_max_out_map_value = 1024,
   .adc2_max_in_map_value = 4095,
   .adc2_min_in_map_value = 0,
   .adc2_min_out_map_value = 0,
-  .adc2_max_out_map_value = 255
+  .adc2_max_out_map_value = 512
 };
 
 interrupt_times_t callback_times = {
   .clk_max = 1500,
   .dt_max = 1500,
   .button_max = 1000,
-  .interruption_max = 1200
+  .interruption_max = 700
 };
 
 rotary_encoder_struct rotary = {
+
   .max_rotation_value = 100,
   .minimum_required_interrupt = 1500
+
 };
 
 pin_manager_t my_pins = { 
+
     .sck = GPIO_TWO,
     .mosi = GPIO_THREE, 
     .miso = GPIO_FOUR, 
     .csn = GPIO_FIVE, 
     .ce = GPIO_SIX 
+
   };
 
 nrf_manager_t my_config = {
@@ -94,10 +119,31 @@ nrf_manager_t my_config = {
     .retr_delay = ARD_500US 
   };
 
+motor_flags_status cfl= {
+
+  .vdti = true,
+  .vdtn = false,
+  .vdtp = false,
+  .hdti = true,
+  .hdtl = false,
+  .hdtr = false
+
+};
+
+battery_data_t bat_status = {
+
+  .battery_high = 0xFF,
+  .battery_medium = 0xB9,
+  .battery_low = 0x55,
+  .battery_critical = 0x1E,
+  .battery_red = 0x20,
+  .battery_blue = 0x40,
+  .battery_green = 0x80,
+  .battery_level = {'B', 'a', 't', 't', 'e', 'r', 'y', ' ', 'L', 'e', 'v', 'e', 'l'}
+
+};
 
 int main() {
-
-  test_run = 0;
 
   stdio_init_all();
 
@@ -106,21 +152,16 @@ int main() {
     
   adc_init();
   adc_pin_setup(&pico_adc);
-
   rotary_encoder_init(&enabled_buttons);
   button_interrupt_init(&enabled_buttons);
-
+  shift_register_pin_init(&reg_pins);
   lcd_init(&lcd_pins);
   lcd_4_bit_init(&lcd_pins);
   
-  gpio_put(lcd_pins.rs_pin, 0);
-    sleep_ms(5);
-  lcd_clear(&lcd_pins);
-    sleep_ms(20);
-  lcd_home(&lcd_pins);
-    sleep_ms(20);
+    gpio_put(lcd_pins.rs_pin, 0);
+    lcd_clear(&lcd_pins);
+    lcd_home(&lcd_pins);
 
-    
   // SPI baudrate
   uint32_t my_baudrate = 5000000;
 
@@ -147,18 +188,25 @@ int main() {
 
 while(1) {
 
+  battery_status_to_shift(&u_vars, &pico_adc, &bat_status, 1);
+   write_display(&lcd_pins, bat_status.battery_level, bat_status.battery_printer);
 
   adc_pin_call(&pico_adc);
+  cycle_handler(&u_vars, &enabled_buttons, rgb_cycle);
   
-    rgb_color_cycle(analog.analog_button_status, analog.reverse_status, rgb.rgb_cycle_value, analog.reverse_cycle);
-    rgb_light_control_buffer(&rgb_lights_register_buffer, rotary.rotary_button_status, analog.reverse_status); 
-    
-    payload_buffer(rgb_lights_register_buffer, analog.vertical_raw_conversion, analog.horizontal_raw_conversion, rotary.rotary_total_value, peri_config_toggle);
-        for(int zv = 0; zv < 4; zv++){
+  payload_buffer(&load_o,&pico_adc, &rotary, &u_vars);
+  serial_register_output(&reg_pins, &u_vars, 1, NULL);
 
-        switch(zv){
+  sprintf(rf_function, "RF Switching");
+  sprintf(rf_transmitting, "Transmitting Now");
+   write_display(&lcd_pins, rf_function, rf_transmitting);
 
-        case 0:
+  for(int zv = 0; zv < 4; zv++){
+
+    switch(zv){
+
+      case 0:
+      sprintf(rf_channel, "Pipeline Zero.");
             printf("Transmitter Switch Case 0.\n");
 
     // send to receiver's DATA_PIPE_0 address
@@ -168,24 +216,29 @@ while(1) {
     time_sent = to_us_since_boot(get_absolute_time()); // time sent
 
     // send packet to receiver's DATA_PIPE_0 address
-    printf("\n Sending: 0b%08x.\n", payload_zero);
-    success = my_nrf.send_packet(&payload_zero, sizeof(payload_zero));
+    printf("\n Sending: 0b%08x.\n", load_o.payload_zero);
+    success = my_nrf.send_packet(&load_o.payload_zero, sizeof(load_o.payload_zero));
+    sprintf(rf_data, "Data Sent: %u.", load_o.payload_zero);
 
     // time auto-acknowledge was received
     time_reply = to_us_since_boot(get_absolute_time()); // response time
 
     if (success)
     {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%08x.\n", time_reply - time_sent, payload_zero);
+      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%08x.\n", time_reply - time_sent, load_o.payload_zero);
+      write_display(&lcd_pins, rf_channel, rf_data);
 
     } else {
 
       printf("\nPacket not sent:- Receiver not available.\n");
+
+     write_display(&lcd_pins, error_char_t, rf_data);
     }
         sleep_ms(300);
 
         break;
         case 1:
+        sprintf(rf_channel, "Pipeline One.");
             printf("Transmitter Switch Case 1.\n");
 
     // send to receiver's DATA_PIPE_1 address
@@ -195,25 +248,30 @@ while(1) {
     time_sent = to_us_since_boot(get_absolute_time()); // time sent
 
     // send packet to receiver's DATA_PIPE_1 address
-    printf("\n Sending: 0b%08x.\n", payload_one.vertical_buffer);
-    printf("\n Sending: 0b%08x.\n", payload_one.horizontal_buffer);
-    success = my_nrf.send_packet(&payload_one, sizeof(payload_one));
-    
+    printf("\n Sending: 0b%08x.\n", load_o.payload_one_t.vertical_buffer);
+    printf("\n Sending: 0b%08x.\n", load_o.payload_one_t.horizontal_buffer);
+    success = my_nrf.send_packet(&load_o.payload_one_t, sizeof(load_o.payload_one_t));
+
+    sprintf(rf_data, "VD: %u HD: %u", load_o.payload_one_t.vertical_buffer, load_o.payload_one_t.horizontal_buffer);
+
     // time auto-acknowledge was received
     time_reply = to_us_since_boot(get_absolute_time()); // response time
 
     if (success)
     {
-        printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x & 0b%04x.\n",time_reply - time_sent, payload_one.vertical_buffer, payload_one.horizontal_buffer);
-      
+        printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x & 0b%04x.\n",time_reply - time_sent, load_o.payload_one_t.vertical_buffer, load_o.payload_one_t.horizontal_buffer);
+        write_display(&lcd_pins, rf_channel, rf_data);
     } else {
 
       printf("\nPacket not sent:- Receiver not available.\n");
+      write_display(&lcd_pins, error_char_t, rf_data);
     }
         sleep_ms(300);
                 
         break;
         case 2:
+
+        sprintf(rf_channel, "Pipeline Two.");
                 printf("Transmitter Switch Case 2.\n");
 
     // send to receiver's DATA_PIPE_2 address
@@ -223,24 +281,29 @@ while(1) {
     time_sent = to_us_since_boot(get_absolute_time()); // time sent
 
     // send packet to receiver's DATA_PIPE_2 address
-    printf("\n Sending: 0b%04x.\n", peri_config_toggle);
-    success = my_nrf.send_packet(&payload_two, sizeof(payload_two));
+    printf("\n Sending: 0b%04x.\n", load_o.payload_two);
+    success = my_nrf.send_packet(&load_o.payload_two, sizeof(load_o.payload_two));
+    sprintf(rf_data, "Payload: %u", load_o.payload_two);
     
     // time auto-acknowledge was received
     time_reply = to_us_since_boot(get_absolute_time()); // response time
 
     if (success)
     {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x.\n", time_reply - time_sent, peri_config_toggle);
+      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x.\n", time_reply - time_sent, load_o.payload_two);
+      write_display(&lcd_pins, rf_channel, rf_data);
 
     }  else {
 
       printf("\nPacket not sent:- Receiver not available.\n");
+      write_display(&lcd_pins, error_char_t, rf_data);
     }
         sleep_ms(300);
 
         break;
         case 3:
+
+        sprintf(rf_channel, "Pipeline Three.");
         printf("Transmitter Switch Case 3.\n");
 
     // send to receiver's DATA_PIPE_3 address
@@ -250,46 +313,34 @@ while(1) {
     time_sent = to_us_since_boot(get_absolute_time()); // time sent
 
     // send packet to receiver's DATA_PIPE_3 address
-    printf("\n Sending: 0b%08x.\n", payload_three);
-    success = my_nrf.send_packet(&payload_three, sizeof(payload_three));
+    printf("\n Sending: 0b%08x.\n", load_o.payload_three);
+    success = my_nrf.send_packet(&load_o.payload_three, sizeof(load_o.payload_three));
+     sprintf(rf_data, "Payload: %u", load_o.payload_three);
 
     // time auto-acknowledge was received
     time_reply = to_us_since_boot(get_absolute_time()); // response time
 
     if (success)
     {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%08x.\n", time_reply - time_sent, payload_three);
+      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%08x.\n", time_reply - time_sent, load_o.payload_three);
+      write_display(&lcd_pins, rf_channel, rf_data);
 
     } else {
 
       printf("\nPacket not sent:- Receiver not available.\n");
+      write_display(&lcd_pins, error_char_t, rf_data);
     }
         sleep_ms(300);
 
         break;
         default:
             printf("Transmitter Switch Default.\n");
+            write_display(&lcd_pins, error_char_t, error_char_b);
         break;
         }
     }
-    sleep_ms(500);
+   // sleep_ms(500);
 
-  
-  if(rotary.rotary_value <= 101){
-    sprintf(top_string, "R Encoder Value");
-    sprintf(bottom_string, "Current: %i", (rotary.rotary_total * 5));
-    write_display(&lcd_pins, top_string, bottom_string, 0, 0);
-  }else{
-    sprintf(top_string, "Maximum Value.");
-    }
-
-  (pico_adc.adc0_mapped_value <= 127) ? gpio_put(lcd_pins.back_light, 0) : photoresistor_status_toggle(&back_time, &pico_adc, &lcd_pins);
-
-  sleep_ms(100);
-
-  if(button_status.rotary_button_status == true){
-    button_status.rotary_button_status = false;
-  }
 }
-// tight_loop_contents();
+tight_loop_contents();
 }

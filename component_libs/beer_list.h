@@ -2,9 +2,11 @@
 #define BEERLIST
 
 #include <stdio.h>
-#include "pico/stdlib.h"
 #include "peri_header.h"
 #include "lcd_16x2.h"
+#include "pico/stdlib.h"
+
+volatile bool back;
 
 char intro_top_line[16] = {'*', '*', 'B', 'e', 'e', 'r', ' ', 'R', 'a', 't', 'e', 'r', '*', '*', '*'};
 char intro_bottom_line[16] = {'F', 'o', 'r', ' ', 'B', 'e', 'e', 'r', ' ', 'D', 'u', 'd', 'e', 's', '*'};
@@ -18,17 +20,15 @@ typedef struct {
     char top_menu_four[16];
     char top_menu_five[16];
     char top_menu_six[16];
-    char top_menu_error[16];
-} top_menu;
+} top_menu_selection;
 
-top_menu t_menu = {
+top_menu_selection t_menu = {
     .top_menu_one = {'*', '*', '*', 'M', 'E', 'N', 'U', '*', '*', '*', '*', '*', '*', '*', '*',},
     .top_menu_two = {'*', '*', 'S', 't', 'y', 'l', 'e', 's', '*', '*', '*', '*', '*', '*', '*',},
     .top_menu_three = {'*', '*', 'C', 'o', 'm', 'p', 'a', 'n', 'i', 'e', 's', '*', '*', '*', '*',},
     .top_menu_four = {'*', '*', 'F', 'a', 'v', 'o', 'r', 'i', 't', 'e', 's', '*', '*', '*', '*',},
     .top_menu_five = {'*', '*', 'D', 'i', 's', 'l', 'i', 'k', 'e', 's', '*', '*', '*', '*', '*',},
     .top_menu_six = {'*', '*', '*', '*', 'A', 'b', 'o', 'u', 't', '*', '*', '*', '*', '*', '*',},
-    .top_menu_error = {'*', '*', '*', '*', '*', 'E', 'R', 'R', 'O', 'R', '*', '*', '*', '*', '*'}
 };
 
 typedef struct {
@@ -100,13 +100,6 @@ beer_companies companies = {
 };
 
 typedef struct {
-    uint8_t top_menu_count;
-    uint8_t style_menu_count;
-    uint8_t company_menu_count;
-}menu_increment_values;
-menu_increment_values menu_values;
-
-typedef struct {
     char voodoo_ranger[16];
     char snake_dog[16];
     char big_little_fish[16];
@@ -173,7 +166,7 @@ typedef struct {
 
     char budweiser[16];
     char miller_lite[16];
-    char henieken[16];
+    char heineken[16];
     char stella_artois[16];
     char corona[16];
     
@@ -183,7 +176,7 @@ style_lagers lagers = {
 
     .budweiser = {'*', '*', 'B', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', '*', '*', '*', '*'},
     .miller_lite = {'*', 'M', 'i', 'l', 'l', 'e', 'r', ' ', 'L', 'i', 't', 'e', '*', '*', '*'},
-    .henieken = {'*', '*', '*', 'H', 'e', 'i', 'n', 'e', 'k', 'e', 'n', '*', '*', '*', '*', '*'},
+    .heineken = {'*', '*', '*', 'H', 'e', 'i', 'n', 'e', 'k', 'e', 'n', '*', '*', '*', '*', '*'},
     .stella_artois = {'*', 'S', 't', 'e', 'l', 'l', 'a', ' ', 'A', 'r', 't', 'o', 'i', 's', '*', '*'},
     .corona = {'*', '*', '*', '*', 'C', 'o', 'r', 'o', 'n', 'a', '*', '*', '*', '*', '*'}
     
@@ -389,542 +382,857 @@ style_sour_ales sour_ales = {
     
 };
 
-
-volatile bool button_return;
-volatile bool rotary_selected;
-
-void menu_selection(bool selection, bool button_return, menu_increment_values *config, const LCDPins *pins){
-
-    switch(config->top_menu_count){
-
-        case 0:
-
-          while(!selection){
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_two, 0, 0, NULL);
-          }
-          while(!button_return){
-            style_selection(config, pins, selection, button_return);
-          }
-          write_display(pins, t_menu.top_menu_one, t_menu.top_menu_two, 0, 0, NULL);
-            break;
-
-        case 1:
-
-          while(!selection){
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_three, 0, 0, NULL);
-          }
-          while(!button_return){
-            company_selection(config, pins, selection, button_return);
-          }
-          write_display(pins, t_menu.top_menu_one, t_menu.top_menu_three, 0, 0, NULL);
-            break;
-
-
-        case 2:
-
-          while(!selection){
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_four, 0, 0, NULL);
-          }
-          while(!button_return){
-            company_selection(config, pins, selection, button_return);
-          }
-          write_display(pins, t_menu.top_menu_one, t_menu.top_menu_four, 0, 0, NULL);
-            break;
-
-        case 3:
-            
-          while(!selection){
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_five, 0, 0, NULL);
-          }
-          while(!button_return){
-            favorites_selection(config, pins, selection, button_return);
-          }
-          write_display(pins, t_menu.top_menu_one, t_menu.top_menu_five, 0, 0, NULL);
-            break;
-
-        case 4:
-            
-          while(!selection){
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_six, 0, 0, NULL);
-          }
-          while(!button_return){
-            dislikes_selection(config, pins, selection, button_return);
-          }
-          write_display(pins, t_menu.top_menu_one, t_menu.top_menu_six, 0, 0, NULL);
-            break;
-
-        case 5:
-            
-          while(!button_return){
-            write_display(pins, about_top_line, about_bottom_line, 0, 0, NULL);
-          }
-            break;
-
-        default:
-            write_display(pins, t_menu.top_menu_one, t_menu.top_menu_error, 0, 0, NULL);
-            break;
-    }
-    }
-
-void style_selection(menu_increment_values *config, const LCDPins *pins, bool selection, bool button_return){
-
-    switch(config->style_menu_count){
-        case 0:
-
-          while(!selection){
-            write_display(pins, t_menu.top_menu_two, styles.IPA, 0, 0, NULL);
-          }
-          while(!button_return){
-            write_display(pins, t_menu.top_menu_two, )
-          }
-            break;
-        case 1:
-            write_display(pins, t_menu.top_menu_two, styles.stout, 0, 0, NULL);
-            break;
-        case 2:
-            write_display(pins, t_menu.top_menu_two, styles.porter, 0, 0, NULL);
-            break;
-        case 3:
-            write_display(pins, t_menu.top_menu_two, styles.lager, 0, 0, NULL);
-            break;
-        case 4:
-            write_display(pins, t_menu.top_menu_two, styles.pilsner, 0, 0, NULL);
-            break;
-        case 5:
-            write_display(pins, t_menu.top_menu_two, styles.wheat_beer, 0, 0, NULL);
-            break;
-        case 6:
-            write_display(pins, t_menu.top_menu_two, styles.pale_ale, 0, 0, NULL);
-            break;
-        case 7:
-            write_display(pins, t_menu.top_menu_two, styles.amber_ale, 0, 0, NULL);
-            break;
-        case 8:
-            write_display(pins, t_menu.top_menu_two, styles.brown_ale, 0, 0, NULL);
-            break;
-        case 9:
-            write_display(pins, t_menu.top_menu_two, styles.belgium_ale, 0, 0, NULL);
-            break;
-        case 10:
-            write_display(pins, t_menu.top_menu_two, styles.belgium_dubbel, 0, 0, NULL);
-            break;
-        case 11:
-            write_display(pins, t_menu.top_menu_two, styles.tripel, 0, 0, NULL);
-            break;
-        case 12:
-            write_display(pins, t_menu.top_menu_two, styles.saison, 0, 0, NULL);
-            break;
-        case 13:
-            write_display(pins, t_menu.top_menu_two, styles.hefeweizen, 0, 0, NULL);
-            break;
-        case 14:
-            write_display(pins, t_menu.top_menu_two, styles.barely_wine, 0, 0, NULL);
-            break;
-        case 15:
-            write_display(pins, t_menu.top_menu_two, styles.sour_ale, 0, 0, NULL);
-            break;
-        default:
-            write_display(pins, t_menu.top_menu_two, t_menu.top_menu_error, 0, 0, NULL);
-            break;
-    }
-}
-
-void company_selection(menu_increment_values *config, const LCDPins *pins, bool selection, bool button_return){
-
-    switch(config->company_menu_count){
-        case 0:
-            write_display(pins, t_menu.top_menu_two, styles.IPA, 0, 0, NULL);
-            break;
-        case 1:
-            write_display(pins, t_menu.top_menu_two, styles.stout, 0, 0, NULL);
-            break;
-        case 2:
-            write_display(pins, t_menu.top_menu_two, styles.porter, 0, 0, NULL);
-            break;
-        case 3:
-            write_display(pins, t_menu.top_menu_two, styles.lager, 0, 0, NULL);
-            break;
-        case 4:
-            write_display(pins, t_menu.top_menu_two, styles.pilsner, 0, 0, NULL);
-            break;
-        case 5:
-            write_display(pins, t_menu.top_menu_two, styles.wheat_beer, 0, 0, NULL);
-            break;
-        case 6:
-            write_display(pins, t_menu.top_menu_two, styles.pale_ale, 0, 0, NULL);
-            break;
-        case 7:
-            write_display(pins, t_menu.top_menu_two, styles.amber_ale, 0, 0, NULL);
-            break;
-        case 8:
-            write_display(pins, t_menu.top_menu_two, styles.brown_ale, 0, 0, NULL);
-            break;
-        case 9:
-            write_display(pins, t_menu.top_menu_two, styles.belgium_ale, 0, 0, NULL);
-            break;
-        case 10:
-            write_display(pins, t_menu.top_menu_two, styles.belgium_dubbel, 0, 0, NULL);
-            break;
-        case 11:
-            write_display(pins, t_menu.top_menu_two, styles.tripel, 0, 0, NULL);
-            break;
-        case 12:
-            write_display(pins, t_menu.top_menu_two, styles.saison, 0, 0, NULL);
-            break;
-        case 13:
-            write_display(pins, t_menu.top_menu_two, styles.hefeweizen, 0, 0, NULL);
-            break;
-        case 14:
-            write_display(pins, t_menu.top_menu_two, styles.barely_wine, 0, 0, NULL);
-            break;
-        case 15:
-            write_display(pins, t_menu.top_menu_two, styles.sour_ale, 0, 0, NULL);
-            break;
-        default:
-            write_display(pins, t_menu.top_menu_two, t_menu.top_menu_error, 0, 0, NULL);
-            break;
-    }
-}
-
-void favorites_selection(menu_increment_values *config, const LCDPins *pins, bool selection, bool button_return){
-
-}
-
-void dislikes_selection(menu_increment_values *config, const LCDPins *pins, bool selection, bool button_return){
-
-}
-
-void beer_selection(){
-
-}
-
 typedef struct {
-    uint8_t current_menu_level;
-    uint8_t current_selection;
-    uint8_t menu_selection;
-    uint8_t previous_menu_zero;
-    uint8_t previous_menu_one;
-    uint8_t previous_menu_two;
-    uint8_t previous_menu_three;
-    uint8_t previous_menu_four;
+    int top_menu_value;
+    int second_menu_value;
+    int third_menu_value;
+    int fourth_menu_value;
+    int menu_level;
+}menu_incrementer_values;
+menu_incrementer_values menu_values;
 
-}menu_values;
 
-menu_values m_vals;
-
-void menu_function(menu_values *values, LCDPins *pins, top_menu *menu, bool return_button, bool selection_button){
-    
-    if(values->current_menu_level == 0 && values->previous_menu_zero == NULL){
-
-        values->current_selection = enabled_buttons.rotary_current_value;
-        enabled_buttons.rotary_current_value = 0;
-
-        switch(values->current_selection){
-            case 0:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_one, 0, 0, NULL);
-              break;
-            case 1:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_two, 0, 0, NULL);
-              break;
-            case 2:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_three, 0, 0, NULL);
-              break;
-            case 3:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_four, 0, 0, NULL);
-              break;
-            case 4:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_five, 0, 0, NULL);
-              break;
-            default:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_error, 0, 0, NULL);
-              break;
-        }
-    
-        values->previous_menu_zero = values->current_selection;
-
-        if(selection_button){
-            values->current_menu_level = 1;
-            values->current_selection = enabled_buttons.rotary_current_value;
-        }
-    }
-    if(values->current_menu_level == 0 && values->previous_menu_zero > 0){
-
-        values->current_selection = enabled_buttons.rotary_current_value 
-
-        switch(values->current_selection){
-            case 0:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_one, 0, 0, NULL);
-              break;
-            case 1:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_two, 0, 0, NULL);
-              break;
-            case 2:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_three, 0, 0, NULL);
-              break;
-            case 3:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_four, 0, 0, NULL);
-              break;
-            case 4:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_five, 0, 0, NULL);
-              break;
-            default:
-              write_display(pins, menu->top_menu_zero, menu->top_menu_error, 0, 0, NULL);
-              break;
-        }
-
-        values->previous_menu_zero = values->current_selection;
-
-         if(selection_button){
-            values->current_menu_level = 1;
-            values->current_selection = enabled_buttons.rotary_current_value;
-        }
-    }
-    if(values->current_menu_level == 1 && values->previous_menu_zero == NULL) {
-
-      values->current_selection = 0;
-      enabled_buttons.rotary_current_value = 0;
-
-        if(!return_button){
-
-            values->current_selection = enabled_buttons.rotary_current_value;
-
-            switch(values->current_selection){
-
-                case 0:
-                  write_display(pins, menu->top_menu_two, styles.IPA, 0, 0, NULL);
-                  break;
-                case 1:
-                  write_display(pins, menu->top_menu_two, styles.stout, 0, 0, NULL);
-                  break;
-                case 2:
-                  write_display(pins, menu->top_menu_two, styles.porter, 0, 0, NULL);
-                  break;
-                case 3:
-                  write_display(pins, menu->top_menu_two, styles.lager, 0, 0, NULL);
-                  break;
-                case 4:
-                  write_display(pins, menu->top_menu_two, styles.pilsner, 0, 0, NULL);
-                  break;
-                case 5:
-                  write_display(pins, menu->top_menu_two, styles.wheat_beer, 0, 0, NULL);
-                  break;
-                case 6:
-                  write_display(pins, menu->top_menu_two, styles.pale_ale, 0, 0, NULL);
-                  break;
-                case 7:
-                  write_display(pins, menu->top_menu_two, styles.amber_ale, 0, 0, NULL);
-                  break;
-                case 8:
-                  write_display(pins, menu->top_menu_two, styles.brown_ale, 0, 0, NULL);
-                  break;
-                case 9:
-                  write_display(pins, menu->top_menu_two, styles.belgium_ale, 0, 0, NULL);
-                  break;
-                case 10:
-                  write_display(pins, menu->top_menu_two, styles.belgium_dubbel, 0, 0, NULL);
-                  break;
-                case 11:
-                  write_display(pins, menu->top_menu_two, styles.tripel, 0, 0, NULL);
-                  break;
-                case 12:
-                  write_display(pins, menu->top_menu_two, styles.saison, 0, 0, NULL);
-                  break;
-                case 13:
-                  write_display(pins, menu->top_menu_two, styles.sour_ale, 0, 0, NULL);
-                  break;
-                  
-            }
-           values->previous_menu_two = values->current_selection;
-
-         if(selection_button){
-            values->current_menu_level = 2;
-            values->current_selection = enabled_buttons.rotary_current_value;
-        }       
-      }
-        values->menu_level -= 1;
-    }
-    if(values->current_menu_level == 1 && values->previous_menu_zero > 0) {
-
-        if(!return_button){
-
-        values->current_selection = values->previous_menu_two;
-
-            switch(values->current_selection){
-
-                case 0:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 1:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 2:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 3:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 4:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 5:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 6:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 7:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 8:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 9:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 10:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 11:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 12:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 13:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                  
-            }
-          if(selection_button){
-            values->current_menu_level = 2;
-            values->menu_selection = menu_one_value;
-        }
-            
-        }
-        values->menu_level -= 1;
-    }
-    if(values->current_menu_level == 2 && values->previous_menu_zero == NULL) {
-
-      values->current_selection = 0;
-      enabled_buttons.rotary_current_value = 0;
-
-        if(!return_button){
-
-          values->current_selection = enabled_buttons.rotary_current_value;
-
-            switch(values->current_selection){
-
-                case 0:
-                  write_display(pins, menu->top_menu_two, styles.IPA, 0, 0, NULL);
-                  break;
-                case 1:
-                  write_display(pins, menu->top_menu_two, styles.stout, 0, 0, NULL);
-                  break;
-                case 2:
-                  write_display(pins, menu->top_menu_two, styles.porter, 0, 0, NULL);
-                  break;
-                case 3:
-                  write_display(pins, menu->top_menu_two, styles.lager, 0, 0, NULL);
-                  break;
-                case 4:
-                  write_display(pins, menu->top_menu_two, styles.pilsner, 0, 0, NULL);
-                  break;
-                case 5:
-                  write_display(pins, menu->top_menu_two, styles.wheat_beer, 0, 0, NULL);
-                  break;
-                case 6:
-                  write_display(pins, menu->top_menu_two, styles.pale_ale, 0, 0, NULL);
-                  break;
-                case 7:
-                  write_display(pins, menu->top_menu_two, styles.amber_ale, 0, 0, NULL);
-                  break;
-                case 8:
-                  write_display(pins, menu->top_menu_two, styles.brown_ale, 0, 0, NULL);
-                  break;
-                case 9:
-                  write_display(pins, menu->top_menu_two, styles.belgium_ale, 0, 0, NULL);
-                  break;
-                case 10:
-                  write_display(pins, menu->top_menu_two, styles.belgium_dubbel, 0, 0, NULL);
-                  break;
-                case 11:
-                  write_display(pins, menu->top_menu_two, styles.tripel, 0, 0, NULL);
-                  break;
-                case 12:
-                  write_display(pins, menu->top_menu_two, styles.saison, 0, 0, NULL);
-                  break;
-                case 13:
-                  write_display(pins, menu->top_menu_two, styles.sour_ale, 0, 0, NULL);
-                  break;
-                  
-            }
-           values->previous_menu_three = values->current_selection;
-       
-       if(selection_button){
-            values->current_menu_level = 3;
-            values->current_selection = enabled_buttons.rotary_current_value;
-        }
-      }
-        values->menu_level -= 1;
-    }
-    if(values->current_menu_level == 2 && values->previous_menu_zero > 0) {
-
-        if(!return_button){
-
-            values->current_selection = values->previous_menu_three
-
-            switch(values->current_selection){
-
-                case 0:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 1:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 2:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 3:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 4:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 5:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 6:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 7:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 8:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 9:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 10:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 11:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 12:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                case 13:
-                  write_display(pins, top_line, bottom_line, 0, 0, NULL);
-                  break;
-                }
-            }
-          if(selection_button){
-            values->current_menu_level = 3;
-            values->current_selection = enabled_buttons.rotary_current_value;
-        }
-    }  
-        values->current_menu_level -= 1;
-    
+void company_beers(LCDPins *pins, menu_incrementer_values *values){
 }
+
+void style_beer_selection(LCDPins *pins, menu_incrementer_values *values){
+
+    values->third_menu_value = 0;
+    values->third_menu_value = enabled_buttons.rotary_current_value;
+  
+  switch(values->third_menu_value) {
+
+    case 0:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(values->third_menu_value == 0){
+        write_display(pins, styles.IPA, ipas.voodoo_ranger, 0, 0);
+        }
+        if(values->third_menu_value == 1){
+        write_display(pins, styles.IPA, ipas.snake_dog, 0, 0);
+        }
+        if(values->third_menu_value == 2){
+        write_display(pins, styles.IPA, ipas.big_little_fish, 0, 0);
+        }
+        if(values->third_menu_value == 3){
+        write_display(pins, styles.IPA, ipas.furious_ipa, 0, 0);
+        }
+        if(values->third_menu_value == 4){
+        write_display(pins, styles.IPA, ipas.union_jack, 0, 0);
+        }
+        if(values->third_menu_value == 5){
+        write_display(pins, styles.IPA, ipas.harvest_ale, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 1:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.stout, stouts.obsidian, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.stout, stouts.milk_stout, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.stout, stouts.the_poet, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.stout, stouts.xocoveza, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.stout, stouts.guiness_extra, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.stout, stouts.double_cream, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 6){
+        write_display(pins, styles.stout, stouts.burbon_county, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 2:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+        
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.porter, porters.coffee_baltic, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.porter, porters.gravity_drop, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.porter, porters.sextus, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.porter, porters.beer_bash, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.porter, porters.baltic_style, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.porter, porters.the_tarten, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 3:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.lager, lagers.budweiser, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.lager, lagers.miller_lite, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.lager, lagers.heineken, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.lager, lagers.stella_artois, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.lager, lagers.corona, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 4:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.pilsner, pilsners.urquell, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.pilsner, pilsners.sts_pils, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.pilsner, pilsners.heater_allen, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.pilsner, pilsners.live_oak, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.pilsner, pilsners.jever, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.pilsner, pilsners.keller_pils, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 5:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.wheat_beer, wheat_beers.allagash, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.wheat_beer, wheat_beers.summer_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.wheat_beer, wheat_beers.blood_orange, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.wheat_beer, wheat_beers.belgin_white, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.wheat_beer, wheat_beers.lambic, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.wheat_beer, wheat_beers.stoopid_wit, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 6:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.pale_ale, pale_ales.fifteen_hundred, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.pale_ale, pale_ales.doggie_style, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.pale_ale, pale_ales.daisey_cutter, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.pale_ale, pale_ales.whirlpool, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.pale_ale, pale_ales.pale_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.pale_ale, pale_ales.sweet_action, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 7:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.amber_ale, amber_ales.fat_tire, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.amber_ale, amber_ales.nugget_nector, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.amber_ale, amber_ales.hop_head_red, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.amber_ale, amber_ales.amber_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.amber_ale, amber_ales.flipside, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 8:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.brown_ale, brown_ales.brown_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.brown_ale, brown_ales.nut_brown, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.brown_ale, brown_ales.best_brown, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.brown_ale, brown_ales.brekles_brown, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.brown_ale, brown_ales.palo_santo, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 9:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.belgium_ale, belgium_ales.red_one, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.belgium_ale, belgium_ales.blonde_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.belgium_ale, belgium_ales.red_two, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.belgium_ale, belgium_ales.krick_lambic, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.belgium_ale, belgium_ales.duvel, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 10:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.abbey_ale, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.soest_road, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.pere_jacques, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.benedicition, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.wild_duck, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.belgium_dubbel, belgium_dubbel.dub_sack, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 11:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.saison, saisons.saison_du_buff, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.saison, saisons.prop_culture, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.saison, saisons.saison_83, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.saison, saisons.saison_du_swamp, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.saison, saisons.eukaryote, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.saison, saisons.stone_saison, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    case 12:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+
+        if(enabled_buttons.rotary_current_value == 0){
+        write_display(pins, styles.sour_ale, sour_ales.miami_madness, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 1){
+        write_display(pins, styles.sour_ale, sour_ales.supplication, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 2){
+        write_display(pins, styles.sour_ale, sour_ales.le_terroin, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 3){
+        write_display(pins, styles.sour_ale, sour_ales.duck_duck_goose, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 4){
+        write_display(pins, styles.sour_ale, sour_ales.amorphia, 0, 0);
+        }
+        if(enabled_buttons.rotary_current_value == 5){
+        write_display(pins, styles.sour_ale, sour_ales.rubaeus, 0, 0);
+        }
+      } else {
+        styles_menu(pins, values);
+      }
+    }
+    break;
+
+    }
+  }
+
+void company_menu(LCDPins *pins, menu_incrementer_values *values){
+       
+    if(values->second_menu_value >= 0 && values->second_menu_value <= 12){
+
+ switch(values->second_menu_value) {
+    case 0:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.anheuser_busch, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 0;
+    }
+    break;
+
+    case 1:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.heineken, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 1;
+    }
+    break;
+
+    case 2:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.constellation_brands, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 2;
+    }
+    break;
+
+    case 3:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.molson_coors_brewing, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 3;
+    }
+    break;
+
+    case 4:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.sierra_nevada, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 4;
+    }
+    break;
+
+    case 5:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.stone_brewing, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 5;
+    }
+    break;
+
+    case 6:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.dog_fish_head, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 6;
+    }
+    break;
+
+    case 7:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.new_belgium, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 7;
+    }
+    break;
+
+    case 8:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.guiness, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 8;
+    }
+    break;
+
+    case 9:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.chimay, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 9;
+
+    }
+    break;
+
+    case 10:
+
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.duval_moorgat, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+    values->second_menu_value = 0;
+    values->third_menu_value = 10;
+    }
+    
+    break;
+
+    case 11:
+
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_three, companies.founders_brewing, 0, 0);
+    } else {
+          company_beers(pins, values);
+        }
+      values->second_menu_value = 0;
+      values->third_menu_value = 11;
+        
+    }
+    break;
+
+    default:
+        printf("Company Menu Selection Error.\n\n");
+
+    }
+  }
+}
+
+void styles_menu(LCDPins *pins, menu_incrementer_values *values){
+
+    values->third_menu_value = 0;
+    
+    if(values->second_menu_value >= 0 && values->second_menu_value <= 15){
+      if(values->menu_level == 2){
+
+ switch(values->second_menu_value) {
+    case 0:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.IPA, 0, 0);
+        }else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 0;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 1:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.stout, 0, 0);
+        } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 1;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 2:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.porter, 0, 0);
+      } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 2;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 3:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.lager, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 3;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 4:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.pilsner, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 4;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 5:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.wheat_beer, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 5;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 6:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.pale_ale, 0, 0);
+      } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 6;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 7:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.amber_ale, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 7;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 8:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.brown_ale, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 8;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 9:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.belgium_ale, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 9;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 10:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.belgium_dubbel, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 10;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 11:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.tripel, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 11;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 12:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.saison, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 12;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 13:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.hefeweizen, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 13;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 14:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status){
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.hefeweizen, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 14;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    case 15:
+      if(!buttons_onoff.rotary_button_status){
+        if(!buttons_onoff.button_one_status) {
+          values->second_menu_value = values->second_menu_value;
+          write_display(pins, t_menu.top_menu_two, styles.sour_ale, 0, 0);
+    } else {
+          top_menu(pins, values);
+        }
+    values->third_menu_value = 15;
+    values->menu_level = 2;
+        style_beer_selection(pins, values);
+    }
+    break;
+
+    default:
+        printf("Style Menu Error.\n\n");
+      }
+    }
+  }
+}
+
+void top_menu(LCDPins *pins, menu_incrementer_values *values) {
+
+  if(enabled_buttons.rotary_current_value != (int)NULL){
+   values->top_menu_value = last_status.basic_rotary_value++;
+  }else {
+    values->top_menu_value = enabled_buttons.rotary_current_value;
+  }
+
+    if(values->top_menu_value >= 0 && values->top_menu_value <= 5){
+
+ switch(values->top_menu_value) {
+    case 0:
+      if(!buttons_onoff.rotary_button_status){
+        values->top_menu_value = values->top_menu_value;
+        write_display(pins, t_menu.top_menu_one, t_menu.top_menu_two, 0, 0);
+      }else{
+    values->second_menu_value = 0;
+    values->menu_level = 1;
+        styles_menu(pins, values);
+      }
+    break;
+
+    case 1:
+      if(!buttons_onoff.rotary_button_status){
+        values->top_menu_value = values->top_menu_value;
+        write_display(pins, t_menu.top_menu_one, t_menu.top_menu_three, 0, 0);
+      }else {
+    values->second_menu_value = 1;
+    values->menu_level = 1;
+        company_menu(pins, values);
+      }
+    break;
+
+    case 2:
+      if(!buttons_onoff.rotary_button_status){
+        values->top_menu_value = values->top_menu_value;
+        write_display(pins, t_menu.top_menu_one, t_menu.top_menu_four, 0, 0);
+      }else {
+    values->second_menu_value = 2;
+    values->menu_level = 1;
+        company_menu(pins, values);
+      }
+    break;
+
+    case 3:
+      if(!buttons_onoff.rotary_button_status){
+        values->top_menu_value = values->top_menu_value;
+        write_display(pins, t_menu.top_menu_one, t_menu.top_menu_five, 0, 0);
+      }else {
+    values->second_menu_value = 3;
+    values->menu_level = 1;
+        company_menu(pins, values);
+      }
+    break;
+
+    default:
+      printf("Top Menu Error.\n\n");
+    }
+  }
+}
+
+
 #endif

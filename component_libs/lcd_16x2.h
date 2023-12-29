@@ -4,12 +4,14 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "pico/stdlib.h"
+#include "peri_header.h"
 #include "hardware/gpio.h"
 
   //    Define a structure to hold lcd configuration.
 typedef struct LCDPins{
     uint rs_pin;
     uint e_pin;
+    uint back_light;
     uint data0_pin;
     uint data1_pin;
     uint data2_pin;
@@ -19,6 +21,19 @@ typedef struct LCDPins{
     uint data6_pin;
     uint data7_pin;
 }LCDPins;
+
+typedef struct {
+    char menu_top_one[16];
+    char menu_bottom_one[16];
+    char menu_top_two[16];
+    char menu_bottom_two[16];
+    char menu_top_three[16];
+    char menu_bottom_three[16];
+    char menu_top_four[16];
+    char menu_bottom_four[16];
+    char menu_top_five[16];
+    char menu_bottom_five[16];
+} menu_arrays;
 
 // LCD commands
 #define LCD_CLEAR_DISPLAY 0x01
@@ -53,6 +68,7 @@ typedef struct LCDPins{
 
 static const uint8_t ddram_line1[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
 static const uint8_t ddram_line2[] = {0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F};
+
 static void send_nibble(const LCDPins *pins, uint8_t data) {
 
     // printf("Printing: 0b%04x.\n", data);
@@ -73,7 +89,7 @@ static void send_nibble(const LCDPins *pins, uint8_t data) {
 
 void lcd_command(const LCDPins *pins, uint8_t cmd) {
 
-    printf("\tLCD Command sent: 0b%04x.\n", cmd);
+  //  printf("\tLCD Command sent: 0b%04x.\n", cmd);
 
     // Set RS to 0 for a command
     gpio_put(pins->rs_pin, 0);
@@ -146,7 +162,7 @@ void lcd_4_bit_init(const LCDPins *pins){
 
 void lcd_init(const LCDPins *pins) {
 
-    printf("Pin Initialization.\n");
+    printf("\n\nPin Initialization.\n");
     // Initialize GPIO pins for the LCD using the lcd_pins struct
     printf("Initializing RS_PIN..\n");
     printf("\tRS_PIN Pulled Low..\n");
@@ -195,7 +211,7 @@ void lcd_init(const LCDPins *pins) {
     
 void lcd_clear(const LCDPins *pins) {
 
-    printf("\n\t\tDisplay Clear.\n");
+  //  printf("\n\t\tDisplay Clear.\n");
 
     gpio_put(pins->rs_pin, 0);   
         sleep_ms(10);
@@ -206,7 +222,7 @@ void lcd_clear(const LCDPins *pins) {
 
 void lcd_home(const LCDPins *pins) {
 
-    printf("\n\t\tCursor Return Home.\n");
+  //  printf("\n\t\tCursor Return Home.\n");
 
     gpio_put(pins->rs_pin, 0);
         sleep_ms(10);
@@ -236,7 +252,7 @@ void lcd_write_char(const LCDPins *pins, char data) {
 void lcd_write_string(const LCDPins *pins, const char *str) {
     // Iterate through the characters in the string and write them one by one
     for (size_t i = 0; str[i] != '\0'; i++) {
-        (i == 0) ? printf("\nWriting: %c.\n", str[i]) : printf("Writing: %c.\n", str[i]);
+     //   (i == 0) ? printf("\nWriting: %c.\n", str[i]) : printf("Writing: %c.\n", str[i]);
         lcd_write_char(pins, str[i]);
     }
 }
@@ -248,10 +264,10 @@ void lcd_set_cursor(const LCDPins *pins, uint8_t row, uint8_t col) {
     uint8_t ddram_addr;
     if (row == 1 && col >= 1 && col <= 16) {
         ddram_addr = ddram_line1[col - 1];
-        printf("ddram addr row 1: %04x.\n", ddram_addr);
+    //   printf("ddram addr row 1: %04x.\n", ddram_addr);
     } else if (row == 2 && col >= 1 && col <= 16) {
         ddram_addr = ddram_line2[col - 1];
-        printf("ddram addr row 2: %04x.\n", ddram_addr);
+    //    printf("ddram addr row 2: %04x.\n", ddram_addr);
     } else {
         // Invalid row or column, do nothing
         return;
@@ -260,76 +276,41 @@ void lcd_set_cursor(const LCDPins *pins, uint8_t row, uint8_t col) {
     // Send the command to set the cursor position
     gpio_put(pins->rs_pin, 0);
         sleep_ms(5);
-    printf("\n\tCursor set at: %i, %i.\n", row, col);
+  //  printf("\n\tCursor set at: %i, %i.\n", row, col);
     lcd_command(pins, LCD_SET_DDRAM_ADDR | ddram_addr);
 
 }
 
-// ANALOG MAP Function.
-long map(long x, long in_min, long in_max, long out_min, long out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-void write_display(const LCDPins *pins, char *top, char *bottom, int top_data, int bottom_data, int cycle_count){
+void write_display(const LCDPins *pins, char *top, char *bottom){
     
-    printf("\n\n\nDisplay Writting function.\n\n");
-    printf("Cycle Count: %d.\n", cycle_count);
+    // printf("\n\n\nDisplay Writting function.\n\n");
 
     gpio_put(pins->rs_pin, 0);
-        sleep_ms(5);
     lcd_clear(pins);
-        sleep_ms(20);
     lcd_home(pins);
         sleep_ms(20);
         
-    if(cycle_count == 0){
-        sprintf(top, "***REITZ_NOW***", top_data);
-        sprintf(bottom, "**alphonseJMR**", bottom_data);
-    }
-
-    if(cycle_count == 1){
-        sprintf(top, "Yo Adam, Chk It", top_data);
-        sprintf(bottom, "**Guess What**", bottom_data);
-    }
-
-    if(cycle_count == 2){
-        sprintf(top, "You****The****", top_data);
-        sprintf(bottom, "***Lost***Game", bottom_data);
-    }
-
-    if(cycle_count == 3){
-        sprintf(top, "Distance: %dcm", top_data);
-        sprintf(bottom, "Light Level: %dl", bottom_data);
-
-    }
-
-    // Print the formatted string
-    //  printf("\n\t%s\n", top);
-    //  printf("\n\t\t%s\n", bottom);
-
     gpio_put(pins->rs_pin, 1);
-        printf("\n\nRS Pulled High:  Data.\n");
+      //  printf("\n\nRS Pulled High:  Data.\n");
         sleep_ms(5);
     lcd_write_string(pins, top);
         sleep_ms(5);
 
     gpio_put(pins->rs_pin, 0);
         sleep_ms(5);
-        printf("\n\nRS Pulled Low:  Command.\n");
+      //  printf("\n\nRS Pulled Low:  Command.\n");
     lcd_set_cursor(pins, 2, 1);
         sleep_ms(5);
 
-    printf("\n\tCommand:  Set Cursor Position.\n");
+   // printf("\n\tCommand:  Set Cursor Position.\n");
         sleep_ms(5);
 
     gpio_put(pins->rs_pin, 1);
-    printf("\n\nRS Pulled High:  Data.\n");
+ //   printf("\n\nRS Pulled High:  Data.\n");
         sleep_ms(5);
     lcd_write_string(pins, bottom);
         sleep_ms(500);
         
 }
-
-
 
 #endif

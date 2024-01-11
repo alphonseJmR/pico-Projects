@@ -35,6 +35,7 @@ typedef struct {
     char menu_bottom_five[16];
 } menu_arrays;
 
+
 // LCD commands
 #define LCD_CLEAR_DISPLAY 0x01
 #define LCD_RETURN_HOME 0x02
@@ -309,7 +310,7 @@ void write_display(const LCDPins *pins, char *top, char *bottom){
  //   printf("\n\nRS Pulled High:  Data.\n");
         sleep_ms(5);
     lcd_write_string(pins, bottom);
-        sleep_ms(500);
+      //  sleep_ms(500);
         
 }
 

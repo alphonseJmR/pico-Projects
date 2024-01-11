@@ -9,11 +9,23 @@
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
 
-char top_string[16];
-char bottom_string[16];
+#define stage_inat 0x00
+#define stage_intl 0x02
+#define stage_indp 0x04
+#define stage_comm 0x08
+#define stage_char 0x10
 
- char error_char_t[16] = {'C', 'h', 'a', 'n', 'n', 'a', 'l', ' ', 'E', 'r', 'r', 'o', 'r'};
- char error_char_b[16] = {'D', 'a', 't', 'a', ' ', 'E', 'r', 'r', 'o', 'r'};
+#define comm_start 0x40
+#define comm_end 0x70
+
+#define e_toggle 0x20
+#define com_sel = 040
+#define backlight_toggle 0x80
+
+#define com_com_e 0xA0
+#define com_com_f 0x80
+#define com_char_e 0xE0
+#define com_char_f 0xC0
 
 enum pico_pins {
   UNDEFINED = -1,
@@ -246,9 +258,11 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 //  Use to console print the binary form of the inputted variable.  Able to accept UINT, UINT8_T, UINT16_T, UINT32_T data.
 //  Example print_binary(0, 0, 2056, 0);  Would print the binary form of the uint16_t value 2056.
-void print_binary(uint byte_input, uint8_t two_byte_input, uint16_t four_byte_input, uint32_t eight_byte_input) {
+void print_binary(uint byte_input, uint8_t two_byte_input) {
+  
     printf("\n");
     if(byte_input > 0){
+      printf("1 Byte:\n");
       for (int i = 3; i >= 0; i--) {
         if ((byte_input >> i) & 1) {
             printf("1");
@@ -256,10 +270,10 @@ void print_binary(uint byte_input, uint8_t two_byte_input, uint16_t four_byte_in
             printf("0");
         }
       }
-    }else {
-      printf("\nNo UINT data.\n");
     }
+
     if(two_byte_input > 0){
+      printf("\n2 Bytes:\n");
       for (int i = 7; i >= 0; i--) {
         if ((two_byte_input >> i) & 1) {
             printf("1");
@@ -267,34 +281,10 @@ void print_binary(uint byte_input, uint8_t two_byte_input, uint16_t four_byte_in
             printf("0");
         }
       }
-    }else {
-      printf("\nNo UINT8_T data.\n");
     }
-    if(four_byte_input > 0){
-      for (int i = 15; i >= 0; i--) {
-        if ((four_byte_input >> i) & 1) {
-            printf("1");
-        } else {
-            printf("0");
-        }
-      }
-    }else {
-      printf("\nNo UINT16_T data.\n");
-    }
-    if(eight_byte_input > 0){
-      for (int i = 31; i >= 0; i--) {
-        if ((eight_byte_input >> i) & 1) {
-            printf("1");
-        } else {
-            printf("0");
-        }
-      }
-    }else {
-      printf("\nNo UINT32_T data.\n");
-    }
-    
+
     printf("\n");
-}
+    }
 
 //  Initial idea -> Based on reg select, the register output can be selected.  Then conditionals subject adc battery data to translation for register ready output.
 void battery_status_to_shift(uint8_variables *vars, adc_port_values *adc, battery_data_t *level, uint8_t register_select){
@@ -511,7 +501,7 @@ void enabled_button_callback(uint gpio, uint32_t events){
 
   if(callback_times.last_interruption >= callback_times.interruption_max){
 
-      printf("Interruption occured at:\n \tPin: %i.\n\tEvent: %i.\n", gpio, events);
+      printf("\nInterruption occured:\n\tLast Interrupt: %u.\n", callback_times.last_interruption);
     callback_times.initial_interruption = callback_times.current_interruption;
     gpio_acknowledge_irq(gpio, events);
   
@@ -521,13 +511,13 @@ void enabled_button_callback(uint gpio, uint32_t events){
     if(gpio == enabled_buttons.rotary_button_clk && (events & 0x04)){
       rotary.current_rotary_clk = gpio_get(enabled_buttons.rotary_button_clk);
       rotary.current_rotary_dt = gpio_get(enabled_buttons.rotary_button_dt);
-        printf("Clk Edge Detected.\n");
+      
       if(rotary.current_rotary_clk != rotary.previous_rotary_clk){
-          printf("Clk Status Changed.\n");
-          printf("CLK Current Status: %i.\n", rotary.current_rotary_clk);
-          printf("DT Current Status: %i.\n", rotary.current_rotary_dt);
+        //  printf("Clk Status Changed.\n");
+        //  printf("CLK Current Status: %i.\n", rotary.current_rotary_clk);
+        //  printf("DT Current Status: %i.\n", rotary.current_rotary_dt);
         if(rotary.current_rotary_dt != rotary.current_rotary_clk){
-          printf("B != A.\n");
+        //  printf("B != A.\n");
             if(rotary.rotary_total <= rotary.max_rotation_value){
           rotary.rotary_total++;
             }else {
@@ -535,7 +525,7 @@ void enabled_button_callback(uint gpio, uint32_t events){
             }
          
         }else {
-            printf("B == A.\n");
+          //  printf("B == A.\n");
             if(rotary.rotary_total > 0){
             rotary.rotary_total--;
             } else {
@@ -690,14 +680,14 @@ void adc_pin_setup(adc_port_values *config) {
 */
 void button_interrupt_init(button_types *types){
 
-  printf("\n\nInterrupt Button Initializing.\n");
+  printf("\nInterrupt Button Initializing.\n\n");
 
         if(types->rotary_button_button != -1){
           gpio_init(types->rotary_button_button);
       gpio_set_dir(types->rotary_button_button, GPIO_IN);
      // gpio_pull_up(types->rotary_button_button);
         gpio_set_irq_enabled_with_callback(types->rotary_button_button, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Rotary: Pin %d.  Initialized.\n\n", types->rotary_button_button);
+        printf("Button Type: Rotary\n\tPin: %d: Initialized.\n\n", types->rotary_button_button);
     } else {
                 printf("Rotary Button Not Used.\n\n");
     }
@@ -707,7 +697,7 @@ void button_interrupt_init(button_types *types){
       gpio_set_dir(types->analog_button_one, GPIO_IN);
       gpio_pull_up(types->analog_button_one);
         gpio_set_irq_enabled_with_callback(types->analog_button_one, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Analog Button One: Pin %d.  Initialized.\n\n", (types->analog_button_one));
+        printf("Button Type: Analog Button One\n\tPin %d: Initialized.\n\n", (types->analog_button_one));
     } else {
         printf("Analog Button One Not Used.\n\n");
     }
@@ -717,7 +707,7 @@ void button_interrupt_init(button_types *types){
       gpio_set_dir(types->analog_button_two, GPIO_IN);
       gpio_pull_up(types->analog_button_one);
         gpio_set_irq_enabled_with_callback(types->analog_button_one, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Analog Button Two: Pin %d.  Initialized.\n\n", types->analog_button_two);
+        printf("Button Type: Analog Button Two\n\tPin %d: Initialized.\n\n", types->analog_button_two);
     } else {
         printf("Analog Button Two Not Used.\n\n");
     }
@@ -727,16 +717,16 @@ void button_interrupt_init(button_types *types){
       gpio_set_dir(types->button_one, GPIO_IN);
       gpio_pull_up(types->button_one);
       gpio_set_irq_enabled_with_callback(types->button_one, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Rotary: Pin %d.  Initialized.\n\n", types->button_one);
+        printf("Button Type: Press\n\tPin %d: Initialized.\n\n", types->button_one);
     } else {
-                printf("Button OneNot Used.\n\n");
+                printf("Button One Not Used.\n\n");
     }
     if(types->button_two != -1){
       gpio_init(types->button_two);
       gpio_set_dir(types->button_two, GPIO_IN);
       gpio_pull_down(types->analog_button_two);
       gpio_set_irq_enabled_with_callback(types->button_two, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Rotary: Pin %d.  Initialized.\n\n", types->button_two);
+        printf("Button Type: Press\n\tPin %d: Initialized.\n\n", types->button_two);
     } else {
                 printf("Button Two Not Used.\n\n");
     }
@@ -746,7 +736,7 @@ void button_interrupt_init(button_types *types){
       gpio_set_dir(types->button_three, GPIO_IN);
       gpio_pull_down(types->button_three);
       gpio_set_irq_enabled_with_callback(types->button_three, 0x04 | 0x08, true, &enabled_button_callback);
-        printf("Button Type: Rotary: Pin %d.  Initialized.\n\n", types->button_three);
+        printf("Button Type: Press\n\tPin %d: Initialized.\n\n", types->button_three);
     } else {
                 printf("Button Three Not Used.\n\n");
     }
@@ -759,7 +749,7 @@ void rotary_encoder_init(button_types *types){
       gpio_set_dir(types->rotary_button_clk, GPIO_IN);
       gpio_pull_up(types->rotary_button_clk);
       gpio_set_irq_enabled_with_callback(types->rotary_button_clk, 0x04, true, &enabled_button_callback);
-        printf("Button Type: Rotary Clk: Pin %d.  Initialized.\n\n", types->rotary_button_clk);
+        printf("Rotary Encoder Clk: Pin %d.\n\tInitialized.\n\n", types->rotary_button_clk);
     } else {
                 printf("Rotary Clk Not Used.\n\n");
     }
@@ -769,7 +759,7 @@ void rotary_encoder_init(button_types *types){
       gpio_set_dir(types->rotary_button_dt, GPIO_IN);
       gpio_pull_up(types->rotary_button_dt);
       gpio_set_irq_enabled_with_callback(types->rotary_button_dt, 0x04, true, &enabled_button_callback);
-        printf("Button Type: Rotary DT: Pin %d.  Initialized.\n\n", types->rotary_button_dt);
+        printf("Rotary Encoder DT: Pin %d.\n\tInitialized.\n\n", types->rotary_button_dt);
     } else {
                 printf("Rotary DT Not Used.\n\n");
     }
@@ -830,48 +820,53 @@ void ultra_sonic_sensor_pin_setup(ultra_sonic_data_t *pins) {
 
 void shift_register_pin_init(register_pins *config){
 
+  printf("\n\t\tCD74HC595E Pin Initialization.\n\n");
+
+  printf("Initializing Register One.\n");
   if(config->register_one_data != UNDEFINED){
+    printf("Register One Data Initializing.\n\n");
     gpio_init(config->register_one_data);
     gpio_set_dir(config->register_one_data, GPIO_OUT);
-    printf("Register One Data Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_data);
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_one_data);
   }
   if(config->register_one_latch != UNDEFINED){
     gpio_init(config->register_one_latch);
     gpio_set_dir(config->register_one_latch, GPIO_OUT);
-    printf("Register One Latch Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_latch);
+    printf("Register One Latch Initializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_one_latch);
   }
   if(config->register_one_enable != UNDEFINED){
     gpio_init(config->register_one_enable);
     gpio_set_dir(config->register_one_enable, GPIO_OUT);
-    printf("Register One Enable Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_one_enable);
+    printf("Register One Enable Initializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_one_enable);
   }
-    if(config->register_two_data != UNDEFINED){
+  printf("Initializing Register Two.\n");
+  if(config->register_two_data != UNDEFINED){
     gpio_init(config->register_two_data);
     gpio_set_dir(config->register_two_data, GPIO_OUT);
-    printf("Register Two Data Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_data);
+    printf("Register Two Data Initializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_two_data);
   }
   if(config->register_two_latch != UNDEFINED){
     gpio_init(config->register_two_latch);
     gpio_set_dir(config->register_two_latch, GPIO_OUT);
-    printf("Register Two Latch Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_latch);
+    printf("Register Two Latch InitInitializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_two_latch);
   }
   if(config->register_two_enable != UNDEFINED){
     gpio_init(config->register_two_enable);
     gpio_set_dir(config->register_two_enable, GPIO_OUT);
-    printf("Register Two Enable Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_two_enable);
+    printf("Register Two Enable Initializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n", config->register_two_enable);
   }
   if(config->register_clk_line != UNDEFINED){
     gpio_init(config->register_clk_line);
     gpio_set_dir(config->register_clk_line, GPIO_OUT);
-    printf("Register Clk Line Init.\n");
-    printf("GPIO PIN %d Initialized.  Direction: OUTPUT.\n", config->register_clk_line);
+    printf("Register Clk Line Initializing.\n\n");
+    printf("GPIO PIN %d Initialized.\n\tDirection: OUTPUT.\n\n", config->register_clk_line);
   }
+  printf("Register pins initialized.\n");
 }
 
 //  Function to create pulse for shift latching.
@@ -879,10 +874,12 @@ void shift_register_pin_init(register_pins *config){
 void latch_data(register_pins *config) {
   if(config->register_one_latch != UNDEFINED){
     gpio_put(config->register_one_latch, 1); // Generate latch pulse for register one.
+      sleep_us(200);
     gpio_put(config->register_one_latch, 0);
   }
   if(config->register_two_latch != UNDEFINED){
     gpio_put(config->register_two_latch, 1); // Generate latch pulse for register two.
+      sleep_us(200);
     gpio_put(config->register_two_latch, 0);
   }
 }
@@ -893,27 +890,25 @@ void clk_pulse(register_pins *config) {
 
   if(config->register_clk_line != UNDEFINED){
     gpio_put(config->register_clk_line, 1); // Generate latch pulse for register's.
+      sleep_us(200);
     gpio_put(config->register_clk_line, 0);
   }
 }
 
-/*
-    ::serial_register_ouput function::
-    Params:
-    uint gpio_display - Reference to gpio pin tied to register display enable.
-    uint gpio_pin -     Reference to serial data output pin.  Currently labeled serialData.  Additional can be added by muxing clock, notOE, and reg_clk.
-    bool data_in[] -    With use for RGB led register and sevsegdis in mind.
-
-*/
-
-void serial_register_output(register_pins *config, uint8_variables *vars, uint register_selection, uint reg_two_sel) {
+//  Function takes register_pins struct, uint8_variable data to output, int between 0-7 for both selections.  Use -1 on either for non-use.
+void serial_register_output(register_pins *config, uint8_variables *vars, int register_selection, int reg_two_sel) {
 
   printf("Serial Register Function Initialized.\n\n");
     //  Set display enable high for duration of data transfer.
     if(config->register_one_data != UNDEFINED){
   printf("Register One Data Line Outputting.\n");
+  printf("Currently outputting register %i.\n", register_selection);
     gpio_put(config->register_one_enable, 1);
       switch(register_selection){
+
+        case -1:
+          printf("Register One Not Selected.\n");
+          break;
 
         case 0:
         //  Create loop to shift data into selected register output.
@@ -1039,6 +1034,10 @@ void serial_register_output(register_pins *config, uint8_variables *vars, uint r
 
             switch(reg_two_sel){
 
+              case -1:
+              printf("Register Two Not Used.\n");
+              break;
+
         case 0:
         //  Create loop to shift data into selected register output.
           for(int a = 0; a < 8; a++){
@@ -1160,6 +1159,187 @@ void serial_register_output(register_pins *config, uint8_variables *vars, uint r
 
 }
 
+uint8_t uint_flip(uint8_t input_byte){
+  uint8_t flipped_val;
+  flipped_val = 0x00;
+
+  flipped_val += (0x01 & (input_byte >> 7)) ? (0x01 << 4) : (0x00 << 4);
+  flipped_val += (0x01 & (input_byte >> 6)) ? (0x01 << 5) : (0x00 << 5);
+  flipped_val += (0x01 & (input_byte >> 5)) ? (0x01 << 6) : (0x00 << 6);
+  flipped_val += (0x01 & (input_byte >> 4)) ? (0x01 << 7) : (0x00 << 7);
+
+  flipped_val += (0x01 & (input_byte >> 3)) ? (0x01 << 0) : (0x00 << 0);
+  flipped_val += (0x01 & (input_byte >> 2)) ? (0x01 << 1) : (0x00 << 1);
+  flipped_val += (0x01 & (input_byte >> 1)) ? (0x01 << 2) : (0x00 << 2);
+  flipped_val += (0x01 & (input_byte >> 0)) ? (0x01 << 3) : (0x00 << 3);
+
+  return flipped_val;
+}
+
+//  Pre-set to register so as to pull high/low the required pins for the lcd to accept data.
+//  Command is user-configed.  RS, E, Backlight - 0x40, 0x20, 0x10.
+void lcd_register_prep(uint8_t command, register_pins *pins){
+
+    uint8_t command_transform;
+
+    command_transform = ((command & 0xF0));
+    for(int j = 0; j < 8; j++){
+                ((command_transform >> j) & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
+                  sleep_us(30);
+                clk_pulse(pins);
+            }
+            latch_data(pins);
+            sleep_us(30);
+            clk_pulse(pins);
+            sleep_us(200);
+}
+
+void byte_shifting(uint8_t command, uint8_t byte_input, register_pins *pins){
+
+  printf("Bit Shifter.\n");
+
+    uint8_t upper_bits;
+    uint8_t lower_bits;
+    uint8_t command_par;
+
+    command_par = (command & 0xFF);
+    printf("Input: %02x.\n", command_par);
+    bool com_t;
+
+    (command_par == 0xE0) ? printf("Character Command.\n") : printf("Com Command.\n");
+    com_t = (command_par == 0xA0) ? true : false;
+
+    //  Call lcd_display_prep first, as this sets the lcd ready for the data input, whether command or char.
+    //  A loop of two, to first shift the upper four bits of the data, then the bottom four bits.
+ 
+    for(int i = 0; i < 2; i++){
+      
+      gpio_put(pins->register_one_enable, 1);
+
+        lcd_register_prep(com_com_e, pins);
+
+      //  printf("Pre Command.\n");
+        //  We don't want to send both upper and lower bits twice, so we'll use the iterations to send the sections.
+        if(i == 0){
+          printf("First Shift / nibble.\n");
+            //  set the variable upper_bits to the output expression.
+            upper_bits = ((command & 0xF0) | ((uint_flip(byte_input) >> 4) & 0x0F));
+            printf("Shifting: %02x.\n", upper_bits);
+            for(int j = 0; j < 8; j++){
+                    //  per iteration, check if upper_bits is a 1 or 0, and put the gpio_pin in the appropriate position.
+                (upper_bits >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
+                  sleep_us(100);
+                clk_pulse(pins);
+            }
+            latch_data(pins);
+            clk_pulse(pins);
+            (com_t) ? printf("Send COMMAND finish.\n") : printf("Send CHARACTER finish.\n");
+            (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
+            
+            printf("\n\n");
+        }
+        
+        if(i == 1){
+          printf("Second Shift / nibble.\n");
+            
+            lower_bits = ((command & 0xF0) | (uint_flip(byte_input) & 0x0F));
+            printf("Shifting: %02x.\n", lower_bits);
+            for(int j = 0; j < 8; j++){
+                (lower_bits >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
+                  sleep_us(100);
+                clk_pulse(pins);
+            }  
+            latch_data(pins);
+            clk_pulse(pins);
+        (com_t) ? printf("Send COMMAND finish.\n") : printf("Send CHARACTER finish.\n");
+        (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
+        
+          printf("\n\n");
+      }
+
+      gpio_put(pins->register_one_enable, 0);
+    }
+}
+
+void lcd_initialize(register_pins *pins){
+
+  printf("Register -> LCD Initialization.\n\n");
+
+  byte_shifting(com_com_e, 0x02, pins);
+    sleep_ms(20);
+    printf("Shifted command: 0x02.\n");
+
+  byte_shifting(com_com_e, 0x03, pins);
+    sleep_ms(10);
+    printf("Shifted command: 0x03.\n");
+
+  byte_shifting(com_com_e, 0x03, pins);
+    sleep_ms(5);
+    printf("Shifted command: 0x03.\n");
+
+  byte_shifting(com_com_e, 0x03, pins);
+    sleep_ms(10);
+    printf("Shifted command: 0x03.\n");
+
+  byte_shifting(com_com_e, 0x28, pins);
+    sleep_ms(20);
+    printf("Shifted command: 0x28.\n");
+
+  byte_shifting(com_com_e, 0x08, pins);
+    sleep_ms(5);
+    printf("Shifted command: 0x08.\n");
+
+  byte_shifting(com_com_e, 0x01, pins);
+    sleep_ms(5);
+    printf("Shifted command: 0x01.\n");
+
+  byte_shifting(com_com_e, 0x06, pins);
+    sleep_ms(10);
+    printf("Shifted command: 0x06.\n\n");
+
+  printf("Register -> LCD Initialized.\n");
+}
+
+void lcd_single_line_out(register_pins *pins, uint8_t comm, const char *display){
+
+  //  printf("\n\nlcd display array size: %u.\n\n", sizeof(display));
+  printf("Single line lcd out func ->\n");
+    for(int i = 0; i < sizeof(display); i++){
+      
+        //  printf("Outputting: %u.\n", display[i]);
+          printf("\n");
+            byte_shifting(comm, display[i], pins);
+              sleep_us(500);
+
+    }
+}
+
+void lcd_screen_write(register_pins *pins, uint8_t com, const char *line_one, const char *line_two){
+
+  printf(" screen write func\n");
+  
+  //  Clear LCD display.
+  byte_shifting(com_com_e, 0x01, pins);
+  sleep_ms(2);
+  //  LCD return home.
+  byte_shifting(com_com_e, 0x02, pins);
+ sleep_us(100);
+  //  Print first line to LCD display.
+  lcd_single_line_out(pins, com_char_e, line_one);
+   sleep_us(100);
+
+  //  Bring LCD display to second line.
+  byte_shifting(com_com_e, 0x80, pins);
+   sleep_us(100);
+  byte_shifting(com_com_e, 0x40, pins);
+  sleep_us(100);
+
+  //  Print second line to LCD display.
+  lcd_single_line_out(pins, com_char_e, line_two);
+    sleep_us(100);
+}
+
+
 void ultra_sonic_distance(ultra_sonic_data_t *data){
 
     printf("\n\tUltrasonic Sensor Function.\n");
@@ -1205,6 +1385,7 @@ void ultra_sonic_distance(ultra_sonic_data_t *data){
 }
 
 void set_servo_position(uint pin_selection){
+  
 
    if(pin_selection == servo_configuration.servo_one_pin){
       pwm_set_gpio_level(pin_selection, (servo_configuration.servo_one_position/20000.f)*39062.f);

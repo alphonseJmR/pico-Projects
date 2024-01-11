@@ -460,12 +460,12 @@ void pwm_set_motor_config(motor_flags_status *flag, pwm_settings_t *pwm){
     }
 }
 
-void motor_activation(pwm_settings_t *pwm, motor_flags_status *flag, payload_recieved_buffer_t *payload){
+void motor_activation(pwm_settings_t *pwm, motor_flags_status *flag, payload_active_s *payload){
 
     printf("Motor Activation Function.\n");
 
-    pwm->analog_vertical_input_level = payload->payload_one_buffer_r.vertical_buffer;
-    pwm->analog_horizontal_input_level = payload->payload_one_buffer_r.horizontal_buffer;
+    pwm->analog_vertical_input_level = payload->pay_one_buffer_s.vertical_active;
+    pwm->analog_horizontal_input_level = payload->pay_one_buffer_s.horizontal_active;
 
     motor_data_display_buffer(pwm);
     motor_flag_status(pwm, flag);

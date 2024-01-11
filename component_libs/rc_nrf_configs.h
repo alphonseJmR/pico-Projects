@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include "nrf24_driver.h"
-#include "dc_motors.h"
+// #include "dc_motors.h"
 #include "peri_header.h"
 #include "stdlib.h"
 #include "hardware/gpio.h"
@@ -20,22 +20,6 @@
 #define r_r 0x04
 #define r_g 0x02
 #define r_b 0x01
-
-typedef enum payload_errors_s {
-
-    STATUS_OK = 0,
-    ERROR_ONE = 1,
-    ERROR_TWO = 2,
-    ERROR_THREE = 3,
-    FAULT = 4
-
-};
-
-typedef struct f_errors_s {
-    uint8_t error_count;
-    bool current_error_status;
-}f_errors_s;
-f_errors_s f_stat;
 
 //  Contains four sets of uint8, 16, && 32's variables for use in payload buffer function.  
 typedef struct buffer_uints {
@@ -66,8 +50,8 @@ typedef struct payloads_t {
 
     struct payload_one_t {
 
-      uint8_t vertical_buffer; 
-      uint8_t horizontal_buffer;
+      uint16_t vertical_buffer; 
+      uint16_t horizontal_buffer;
 
     }payload_one_t;
 
@@ -84,8 +68,8 @@ typedef struct payload_recieved_buffer_t {
 
     struct payload_one_buffer_r {
 
-        uint8_t vertical_buffer;
-        uint8_t horizontal_buffer;
+        uint16_t vertical_buffer;
+        uint16_t horizontal_buffer;
 
     }payload_one_buffer_r;
 
@@ -95,6 +79,74 @@ typedef struct payload_recieved_buffer_t {
 
 }payload_recieved_buffer_t;
 payload_recieved_buffer_t payload_recieved;
+
+typedef struct payload_active_s {
+
+        uint8_t pay_zero;
+
+    struct pay_one_buffer_s {
+
+        uint16_t vertical_active;
+        uint16_t horizontal_active;
+
+    }pay_one_buffer_s;
+
+    uint8_t pay_two;
+
+    uint16_t pay_three;
+
+}payload_active_s;
+payload_active_s active_payload;
+
+typedef struct rf_lcd_array_s {
+
+  char rf_channel[16];
+
+  char rf_data[16];
+  char rf_data_two[16];
+
+  char top_string[16];
+  char bottom_string[16];
+
+ char rf_function[16];
+ char rf_transmitting[16];
+ char void_char_d[16];
+ char error_char_t[16];
+ char error_char_b[16];
+
+}rf_lcd_array_s;
+rf_lcd_array_s rf_arr;
+
+void initialize_print_debug(nrf_manager_t *config, pin_manager_t *pins, uint32_t baud){
+    printf("\nNRF Initializion:\n");
+
+    printf("\nPINS:\n\tSCK: %u\n", pins->sck);
+        sleep_ms(100);
+    printf("\tMOSI: %u", pins->mosi);
+        sleep_ms(100);
+    printf("\n\tMISO: %u", pins->miso);
+        sleep_ms(100);
+    printf("\n\tCSN: %u", pins->csn);
+        sleep_ms(100);
+    printf("\n\tCE: %u\n", pins->ce);
+        sleep_ms(100);
+    printf("Channel:\t%u.\n", config->channel);
+        sleep_ms(100);
+    printf("Address Width:\t%u.\n", config->address_width);
+        sleep_ms(100);
+    printf("Dynamic Payload: %u.\n", config->dyn_payloads);
+        sleep_ms(100);
+    printf("Data Rate:\t%u.\n", config->data_rate);
+        sleep_ms(100);
+    printf("Power Level:\t%u.\n", config->power);
+        sleep_ms(100);
+    printf("Retry Count:\t%u.\n", config->retr_count);
+        sleep_ms(100);
+    printf("Retry Delay:\t%u.\n", config->retr_delay);
+        sleep_ms(100);
+    printf("BAUDRATE:\t%u", baud);
+        sleep_ms(100);
+}
 
 void rc_light_register_initialize(uint8_variables *reg_value){
 
@@ -181,23 +233,26 @@ void payload_buffer(payloads_t *load, adc_port_values *adc_mapped, rotary_encode
     printf("Transmitter Payload Buffer: \n");
     
   //  Payload sending to nrf receiever data pipe 0.
+    if(res->rotary_total == 0){
+        res->rotary_total = 1;
+    }
         load->payload_zero = res->rotary_total;
-            printf("Transmitter Data Pipe 0: %02x.\n", load->payload_zero);
+            printf("Transmitter Data Pipe 0: %04x.\n\n", load->payload_zero);
   
   //  Payload sending to nrf receiver data pipe 1.
         load->payload_one_t.vertical_buffer = adc_mapped->adc1_mapped_value;
         load->payload_one_t.horizontal_buffer = adc_mapped->adc2_mapped_value;
-            printf("Transmitter Data Pipe 1 Vertical: %02x.\n", load->payload_one_t.vertical_buffer);
-            printf("Transmitter Data Pipe 1 Horizontal: %02x.\n", load->payload_one_t.horizontal_buffer);
+            printf("Transmitter Data Pipe 1 Vertical: %04x.\n", load->payload_one_t.vertical_buffer);
+            printf("Transmitter Data Pipe 1 Horizontal: %04x.\n\n", load->payload_one_t.horizontal_buffer);
   //  Payload sending to nrf receiver data pipe 1
         load->payload_two = regs->register_value_zero;
-            printf("Transmitter Data Pipe 0: %02x.\n", load->payload_two);
+            printf("Transmitter Data Pipe 2: %04x.\n", load->payload_two);
 
   //  Payload sending to nrf receiver data pipe 1
         load->payload_three = regs->register_value_one;
-            printf("Transmitter Data Pipe 0: %02x.\n", load->payload_three);
+            printf("Transmitter Data Pipe 3: %04x.\n\n", load->payload_three);
 
-    printf("Transmitter Buffer Complete.\n");
+    printf("Transmitter Buffer Complete.\n\n");
 
     
 }
@@ -218,4 +273,5 @@ void cycle_handler(uint8_variables *reg_value, button_types *button, int input){
         reg_value->register_value_zero ^= rear_l;
     }
 }
+
 #endif

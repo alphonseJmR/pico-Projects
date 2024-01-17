@@ -94,7 +94,7 @@ pin_manager_t my_pins = {
 
 nrf_manager_t my_config = {
     // RF Channel 
-    .channel = 110,
+    .channel = 120,
 
     // AW_3_BYTES, AW_4_BYTES, AW_5_BYTES
     .address_width = AW_5_BYTES,
@@ -106,7 +106,7 @@ nrf_manager_t my_config = {
     .data_rate = RF_DR_1MBPS,
 
     // RF_PWR_NEG_18DBM, RF_PWR_NEG_12DBM, RF_PWR_NEG_6DBM, RF_PWR_0DBM
-    .power = RF_PWR_NEG_12DBM,
+    .power = RF_PWR_NEG_6DBM,
 
     // retransmission count: ARC_NONE...ARC_15RT
     .retr_count = ARC_10RT,
@@ -126,14 +126,6 @@ battery_data_t bat_status = {
   .battery_green = 0x80,
   .battery_level = {'B', 'a', 't', 't', 'e', 'r', 'y', ' ', 'L', 'e', 'v', 'e', 'l'}
 
-};
-
-payloads_t load_o = {
-  .payload_zero = 0x00,
-  .payload_one_t.vertical_buffer = 0x00,
-  .payload_one_t.horizontal_buffer = 0x00,
-  .payload_two = 0x00,
-  .payload_three = 0x00
 };
 
 int main() {
@@ -193,10 +185,13 @@ while(1) {
 
   //  Begin Transmitting RF data.
 
+  byte_shifting(com_char_e, 0x64, &reg_pins);
+
 
   for(int zv = 0; zv < 1; zv++)
   {
-    sprintf(rf_arr.rf_channel, "Pipeline Zero.");
+    
+      sprintf(rf_arr.rf_channel, "Pipeline Zero.");
       printf("Pipeline 0.\n");
 
     // send to receiver's DATA_PIPE_0 address
@@ -217,17 +212,20 @@ while(1) {
     if (success)
     {
       printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x.\n", time_reply - time_sent, load_o.payload_zero);
-      //  lcd_screen_write(&reg_pins, com_char_e, rf_arr.rf_channel, rf_arr.rf_data);
+    lcd_screen_write(&reg_pins, com_char_e, rf_arr.rf_channel, rf_arr.rf_data);
 
     } 
     else
     {
 
       printf("\nPacket not sent:- Receiver not available.\n");
-      //  lcd_screen_write(&reg_pins, com_char_e, rf_arr.error_char_t, rf_arr.rf_data);
+      lcd_screen_write(&reg_pins, com_char_e, rf_arr.error_char_t, rf_arr.rf_data);
 
     }
+
+
     
+
     sprintf(rf_arr.rf_channel, "Pipeline One.");
       printf("Pipeline 1.\n");
     // send to receiver's DATA_PIPE_1 address
@@ -308,9 +306,7 @@ while(1) {
 
     }    
   
-
-
-    sleep_ms(500);
+    sleep_ms(950);
     printf("Next Iteration?\n");
 }
 tight_loop_contents();

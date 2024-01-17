@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "timer.h": "c",
-        "nrf24_driver.h": "c",
-        "map": "c"
-    },
-    "C_Cpp.errorSquiggles": "enabled"
-}

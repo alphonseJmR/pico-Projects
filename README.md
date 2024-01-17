@@ -1,18 +1,6 @@
-# pico-Projects
+# Pico-Projects:
 
-#FOLDERS:
-
-  analog_fun
-  motor_run
-  RC_CONTROLLER_PROGRAM
-  RC_RECEIVER_PROGRAM
-  rf_driver_attempt
-  rf_driver_receiver_attempt
-  rotary_segment_display
-  rot_serve
-  roverProject
-  servo_test
-  spin_me_hall_round
+(Currently in process of editing)
 
   EXTRA FILES/FOLDERS:
     build/

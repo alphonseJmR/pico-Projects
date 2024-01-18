@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "lcd_16x2.h"
 #include "hardware/gpio.h"
@@ -258,31 +259,19 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 //  Use to console print the binary form of the inputted variable.  Able to accept UINT, UINT8_T, UINT16_T, UINT32_T data.
 //  Example print_binary(0, 0, 2056, 0);  Would print the binary form of the uint16_t value 2056.
-void print_binary(uint byte_input, uint8_t two_byte_input) {
+void print_binary(uint8_t byte_input) {
   
     printf("\n");
     if(byte_input > 0){
-      printf("1 Byte:\n");
-      for (int i = 3; i >= 0; i--) {
-        if ((byte_input >> i) & 1) {
-            printf("1");
-        } else {
-            printf("0");
-        }
-      }
-    }
-
-    if(two_byte_input > 0){
-      printf("\n2 Bytes:\n");
+    //printf("1 Byte:\n");
       for (int i = 7; i >= 0; i--) {
-        if ((two_byte_input >> i) & 1) {
+        if ((byte_input >> i) & 0x01) {
             printf("1");
         } else {
             printf("0");
         }
       }
     }
-
     printf("\n");
     }
 
@@ -874,12 +863,12 @@ void shift_register_pin_init(register_pins *config){
 void latch_data(register_pins *config) {
   if(config->register_one_latch != UNDEFINED){
     gpio_put(config->register_one_latch, 1); // Generate latch pulse for register one.
-      sleep_us(200);
+      sleep_ms(2);
     gpio_put(config->register_one_latch, 0);
   }
   if(config->register_two_latch != UNDEFINED){
     gpio_put(config->register_two_latch, 1); // Generate latch pulse for register two.
-      sleep_us(200);
+      sleep_ms(2);
     gpio_put(config->register_two_latch, 0);
   }
 }
@@ -890,7 +879,7 @@ void clk_pulse(register_pins *config) {
 
   if(config->register_clk_line != UNDEFINED){
     gpio_put(config->register_clk_line, 1); // Generate latch pulse for register's.
-      sleep_us(200);
+      sleep_ms(2);
     gpio_put(config->register_clk_line, 0);
   }
 }
@@ -1163,15 +1152,15 @@ uint8_t uint_flip(uint8_t input_byte){
   uint8_t flipped_val;
   flipped_val = 0x00;
 
-  flipped_val += (0x01 & (input_byte >> 7)) ? (0x01 << 4) : (0x00 << 4);
-  flipped_val += (0x01 & (input_byte >> 6)) ? (0x01 << 5) : (0x00 << 5);
-  flipped_val += (0x01 & (input_byte >> 5)) ? (0x01 << 6) : (0x00 << 6);
-  flipped_val += (0x01 & (input_byte >> 4)) ? (0x01 << 7) : (0x00 << 7);
+  flipped_val += (0x01 & (input_byte >> 7)) ? (0x01 << 0) : (0x00 << 0);
+  flipped_val += (0x01 & (input_byte >> 6)) ? (0x01 << 1) : (0x00 << 1);
+  flipped_val += (0x01 & (input_byte >> 5)) ? (0x01 << 2) : (0x00 << 2);
+  flipped_val += (0x01 & (input_byte >> 4)) ? (0x01 << 3) : (0x00 << 3);
 
-  flipped_val += (0x01 & (input_byte >> 3)) ? (0x01 << 0) : (0x00 << 0);
-  flipped_val += (0x01 & (input_byte >> 2)) ? (0x01 << 1) : (0x00 << 1);
-  flipped_val += (0x01 & (input_byte >> 1)) ? (0x01 << 2) : (0x00 << 2);
-  flipped_val += (0x01 & (input_byte >> 0)) ? (0x01 << 3) : (0x00 << 3);
+  flipped_val += (0x01 & (input_byte >> 3)) ? (0x01 << 7) : (0x00 << 7);
+  flipped_val += (0x01 & (input_byte >> 2)) ? (0x01 << 6) : (0x00 << 6);
+  flipped_val += (0x01 & (input_byte >> 1)) ? (0x01 << 5) : (0x00 << 5);
+  flipped_val += (0x01 & (input_byte >> 0)) ? (0x01 << 4) : (0x00 << 4);
 
   return flipped_val;
 }
@@ -1182,16 +1171,22 @@ void lcd_register_prep(uint8_t command, register_pins *pins){
 
     uint8_t command_transform;
 
-    command_transform = ((command & 0xF0));
-    for(int j = 0; j < 8; j++){
+    printf("LCD Prep Input: %02x.\n", (command & 0xF0));
+    command_transform = uint_flip((command & 0xF0));
+    printf("LCD Prep Output: %02x.\n", (command_transform & 0x0F));
+
+        gpio_put(pins->register_one_enable, 1);
+
+    for(int j = 8; j >= 0; j--){
+            command_transform = (j < 6) ? (command_transform ^= (command_transform & 0x04)) : command_transform;
                 ((command_transform >> j) & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
-                  sleep_us(30);
+                  sleep_ms(2);
                 clk_pulse(pins);
             }
             latch_data(pins);
-            sleep_us(30);
             clk_pulse(pins);
-            sleep_us(200);
+
+        gpio_put(pins->register_one_enable, 0);
 }
 
 void byte_shifting(uint8_t command, uint8_t byte_input, register_pins *pins){
@@ -1200,10 +1195,16 @@ void byte_shifting(uint8_t command, uint8_t byte_input, register_pins *pins){
 
     uint8_t upper_bits;
     uint8_t lower_bits;
+    uint8_t send_byte;
+
+    uint8_t command_flip;
     uint8_t command_par;
+
+    command_flip = uint_flip(command);
 
     command_par = (command & 0xFF);
     printf("Input: %02x.\n", command_par);
+    printf("Byte Input: %02x.\n", byte_input);
     bool com_t;
 
     (command_par == 0xE0) ? printf("Character Command.\n") : printf("Com Command.\n");
@@ -1213,46 +1214,54 @@ void byte_shifting(uint8_t command, uint8_t byte_input, register_pins *pins){
     //  A loop of two, to first shift the upper four bits of the data, then the bottom four bits.
  
     for(int i = 0; i < 2; i++){
-      
-      gpio_put(pins->register_one_enable, 1);
 
+      send_byte = 0x00;
+      
         lcd_register_prep(com_com_e, pins);
+          gpio_put(pins->register_one_enable, 1);
 
       //  printf("Pre Command.\n");
         //  We don't want to send both upper and lower bits twice, so we'll use the iterations to send the sections.
         if(i == 0){
-          printf("First Shift / nibble.\n");
+          printf("\nFirst Shift / nibble.\n");
             //  set the variable upper_bits to the output expression.
-            upper_bits = ((command & 0xF0) | ((uint_flip(byte_input) >> 4) & 0x0F));
-            printf("Shifting: %02x.\n", upper_bits);
-            for(int j = 0; j < 8; j++){
+            lower_bits += (command_flip & 0x0F);
+            upper_bits += (byte_input & 0xF0);
+            send_byte += ((upper_bits & 0xF0) | (lower_bits & 0x0F));
+            print_binary(send_byte);
+            printf("Shifting Upper Bits: %02x.\n", upper_bits);
+            for(int j = 8; j >= 0; j--){
                     //  per iteration, check if upper_bits is a 1 or 0, and put the gpio_pin in the appropriate position.
-                (upper_bits >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
-                  sleep_us(100);
+            lower_bits = (j < 6) ? (lower_bits ^= (lower_bits & 0x04)) : lower_bits;
+                (send_byte >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
+                  sleep_ms(10);
                 clk_pulse(pins);
             }
             latch_data(pins);
             clk_pulse(pins);
             (com_t) ? printf("Send COMMAND finish.\n") : printf("Send CHARACTER finish.\n");
-            (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
+           // (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
             
             printf("\n\n");
         }
         
         if(i == 1){
           printf("Second Shift / nibble.\n");
-            
-            lower_bits = ((command & 0xF0) | (uint_flip(byte_input) & 0x0F));
-            printf("Shifting: %02x.\n", lower_bits);
-            for(int j = 0; j < 8; j++){
-                (lower_bits >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
-                  sleep_us(100);
+            lower_bits += ((command_flip & 0x0F) >> 4);
+            upper_bits += ((byte_input << 4)& 0xF0);
+            send_byte += ((upper_bits & 0xF0) | (lower_bits & 0x0F));
+            print_binary(send_byte);
+            printf("Shifting Lower Bits: %02x.\n", lower_bits);
+            for(int j = 8; j >= 0; j--){
+            lower_bits = (j < 6) ? (lower_bits ^= (lower_bits & 0x04)) : lower_bits;
+                (send_byte >> j & 0x01) ? gpio_put(pins->register_one_data, 1) : gpio_put(pins->register_one_data, 0);
+                  sleep_ms(10);
                 clk_pulse(pins);
             }  
             latch_data(pins);
             clk_pulse(pins);
         (com_t) ? printf("Send COMMAND finish.\n") : printf("Send CHARACTER finish.\n");
-        (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
+       // (com_t) ? lcd_register_prep(com_com_f, pins) : lcd_register_prep(com_char_f, pins);
         
           printf("\n\n");
       }
@@ -1266,36 +1275,20 @@ void lcd_initialize(register_pins *pins){
   printf("Register -> LCD Initialization.\n\n");
 
   byte_shifting(com_com_e, 0x02, pins);
-    sleep_ms(20);
+    sleep_ms(50);
     printf("Shifted command: 0x02.\n");
-
-  byte_shifting(com_com_e, 0x03, pins);
-    sleep_ms(10);
-    printf("Shifted command: 0x03.\n");
-
-  byte_shifting(com_com_e, 0x03, pins);
-    sleep_ms(5);
-    printf("Shifted command: 0x03.\n");
-
-  byte_shifting(com_com_e, 0x03, pins);
-    sleep_ms(10);
-    printf("Shifted command: 0x03.\n");
 
   byte_shifting(com_com_e, 0x28, pins);
     sleep_ms(20);
     printf("Shifted command: 0x28.\n");
 
-  byte_shifting(com_com_e, 0x08, pins);
+  byte_shifting(com_com_e, 0x0C, pins);
     sleep_ms(5);
     printf("Shifted command: 0x08.\n");
 
   byte_shifting(com_com_e, 0x01, pins);
     sleep_ms(5);
     printf("Shifted command: 0x01.\n");
-
-  byte_shifting(com_com_e, 0x06, pins);
-    sleep_ms(10);
-    printf("Shifted command: 0x06.\n\n");
 
   printf("Register -> LCD Initialized.\n");
 }
@@ -1304,7 +1297,7 @@ void lcd_single_line_out(register_pins *pins, uint8_t comm, const char *display)
 
   //  printf("\n\nlcd display array size: %u.\n\n", sizeof(display));
   printf("Single line lcd out func ->\n");
-    for(int i = 0; i < sizeof(display); i++){
+    for(int i = 0; i < strlen(display); i++){
       
         //  printf("Outputting: %u.\n", display[i]);
           printf("\n");
@@ -1320,23 +1313,22 @@ void lcd_screen_write(register_pins *pins, uint8_t com, const char *line_one, co
   
   //  Clear LCD display.
   byte_shifting(com_com_e, 0x01, pins);
-  sleep_ms(2);
-  //  LCD return home.
-  byte_shifting(com_com_e, 0x02, pins);
- sleep_us(100);
+  sleep_ms(20);
+
   //  Print first line to LCD display.
   lcd_single_line_out(pins, com_char_e, line_one);
-   sleep_us(100);
+   sleep_ms(20);
 
   //  Bring LCD display to second line.
   byte_shifting(com_com_e, 0x80, pins);
-   sleep_us(100);
+   sleep_ms(20);
+
   byte_shifting(com_com_e, 0x40, pins);
-  sleep_us(100);
+  sleep_ms(20);
 
   //  Print second line to LCD display.
   lcd_single_line_out(pins, com_char_e, line_two);
-    sleep_us(100);
+    sleep_ms(20);
 }
 
 

@@ -10,9 +10,11 @@ typedef enum function_acknowledgement {
     pins_ack,
     ili_ack,
     general_ack,
+    length_ack,
     packet_part,
-    paket_built,
-    pins_init_ack
+    packet_built,
+    pins_init_ack,
+    register_written
 
 }func_ack;
 

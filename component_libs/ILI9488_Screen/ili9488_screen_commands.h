@@ -1,6 +1,9 @@
 #ifndef ILI9488_SCREEN_COMMANDS
 #define ILI9488_SCREEN_COMMANDS
 
+#include <stdio.h>
+
+
 //________________________________________________________________________________
 //  Ilitek ILI9488 a-Si TFT LCD Single Chip Driver commands start: page 140.
 //  Bit Setup: | D/Cx | RDX | WRX | D7 | D6 | D5 | D4 | D3 | D2 | D1 | D0 | hex |
@@ -136,5 +139,46 @@
 #define Packet_Header_DI_AwER 0x02      //  Acknowledge with Error Report
 #define Packet_Header_DI_DCSRRO_S 0x21  //  DCS Read Short Response, 1 byte returned.
 #define Packet_Header_DI_DCSRRT_S 0x22  //  DCS Read Short Response, 2 byte retunred.
+
+/* RGB 24-bits color table definition (RGB888). */
+#define COLOR_BLACK          (0x000000u)
+#define COLOR_WHITE          (0xFFFFFFu)
+#define COLOR_BLUE           (0x0000FFu)
+#define COLOR_GREEN          (0x00FF00u)
+#define COLOR_RED            (0xFF0000u)
+#define COLOR_NAVY           (0x000080u)
+#define COLOR_DARKBLUE       (0x00008Bu)
+#define COLOR_DARKGREEN      (0x006400u)
+#define COLOR_DARKCYAN       (0x008B8Bu)
+#define COLOR_CYAN           (0x00FFFFu)
+#define COLOR_TURQUOISE      (0x40E0D0u)
+#define COLOR_INDIGO         (0x4B0082u)
+#define COLOR_DARKRED        (0x800000u)
+#define COLOR_OLIVE          (0x808000u)
+#define COLOR_GRAY           (0x808080u)
+#define COLOR_SKYBLUE        (0x87CEEBu)
+#define COLOR_BLUEVIOLET     (0x8A2BE2u)
+#define COLOR_LIGHTGREEN     (0x90EE90u)
+#define COLOR_DARKVIOLET     (0x9400D3u)
+#define COLOR_YELLOWGREEN    (0x9ACD32u)
+#define COLOR_BROWN          (0xA52A2Au)
+#define COLOR_DARKGRAY       (0xA9A9A9u)
+#define COLOR_SIENNA         (0xA0522Du)
+#define COLOR_LIGHTBLUE      (0xADD8E6u)
+#define COLOR_GREENYELLOW    (0xADFF2Fu)
+#define COLOR_SILVER         (0xC0C0C0u)
+#define COLOR_LIGHTGREY      (0xD3D3D3u)
+#define COLOR_LIGHTCYAN      (0xE0FFFFu)
+#define COLOR_VIOLET         (0xEE82EEu)
+#define COLOR_AZUR           (0xF0FFFFu)
+#define COLOR_BEIGE          (0xF5F5DCu)
+#define COLOR_MAGENTA        (0xFF00FFu)
+#define COLOR_TOMATO         (0xFF6347u)
+#define COLOR_GOLD           (0xFFD700u)
+#define COLOR_ORANGE         (0xFFA500u)
+#define COLOR_SNOW           (0xFFFAFAu)
+#define COLOR_YELLOW         (0xFFFF00u)
+
+
 
 #endif

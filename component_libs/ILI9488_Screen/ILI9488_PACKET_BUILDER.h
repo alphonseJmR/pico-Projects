@@ -1,12 +1,13 @@
-#ifndef ILI9488_PACKET_BUILDER
-#define ILI9488_PACKET_BUILDER
+#ifndef ILI9488_PACKET_BUILDER_H
+#define ILI9488_PACKET_BUILDER_H
 
 #include <stdio.h>
-#include <stdint.h>
 #include "hardware/spi.h"
 #include "ili9488_screen_commands.h"
 #include "ili9488_error_management.h"
 #include "ili9488_pin_management.h"
+#include "ILI9488_FUNCTION.h"
+#include "ili9488_func_def.h"
 #include "spi_management.h"
 
 #define ili_VC 0x00                 //  The ili9488 virtual channel is only 0b00.
@@ -35,6 +36,10 @@
 #define LPA false
 #define SPA true
 
+#define ili9488_device code (0x9488u)
+
+#define u8 uint8_t
+
 typedef enum word_count_s {
     ONE_BYTE = 0,
     TWO_BYTE,
@@ -42,17 +47,6 @@ typedef enum word_count_s {
     FOUR_BYTE,
     FIVE_BYTE
 }word_count;
-
-typedef struct spi_variables_s {
-
-    spi_inst_t *instance;
-    uint baudrate;
-
-    uint8_t spi_src;
-    uint8_t spi_dst;
-    size_t spi_len;
-
-}spi_vars;
 
 typedef struct spi_packet_parts_s {
 
@@ -67,27 +61,38 @@ typedef struct spi_packet_parts_s {
     uint8_t Data_Four;
     uint8_t CRC_LSB;
     uint8_t CRC_MSB;
-   uint32_t send_packet;
 
 }spi_packet_parts_s;
 
 spi_packet_parts_s L_pa;
 spi_packet_parts_s S_pa;
 
+spi_packet_parts_s build_packet(spi_packet_parts_s *packet, u8 command, u8 word_lsb, u8 word_msb, u8 ecc, u8 d_zero, u8 d_one, u8 d_two, u8 d_three, u8 d_four, u8 crc_lsb, u8 crc_msb){
+
+  packet->Data_Id = command;
+  packet->Word_Count_LSB = word_lsb;
+  packet->Word_Count_MSB = word_msb;
+  packet->Ecc = ecc;
+  packet->Data_Zero = d_zero;
+  packet->Data_One = d_one;
+  packet->Data_Two = d_two;
+  packet->Data_Three = d_three;
+  packet->Data_Four = d_four;
+  packet->CRC_LSB = crc_lsb;
+  packet->CRC_MSB = crc_msb;
+
+  return *packet;
+}
+
+//  Use build_packet(&S_pa, , NULL, NULL, 0x09, 0x14, NULL, NULL, NULL, NULL, NULL)
+
+/*
+
 typedef struct spi_packet_builder_s {
 
     uint32_t (*spa_build_packet)(spi_packet_parts_s packet);
     uint64_t (*lpa_build_packet)(spi_packet_parts_s packet, uint word_count);
-
-    func_ack (*spi_send_packet)(spi_packet_parts_s packet);
-    func_ack (*build_DI)(spi_packet_parts_s packet, uint spa_parameter);
-    func_ack (*build_DZero)(spi_packet_parts_s packet, uint spa_parameter);
-    func_ack (*build_DOne)(spi_packet_parts_s packet, uint spa_parameter);
-    func_ack (*build_DTwo)(spi_packet_parts_s packet, uint lpa_parameter);
-    func_ack (*build_DThree)(spi_packet_parts_s packet, uint lpa_parameter);
-    func_ack (*build_DFour)(spi_packet_parts_s packet, uint lpa_parameter);
-    func_ack (*build_Ecc)(spi_packet_parts_s packet, uint spa_parameter);
-
+    func_ack (*spi_send_packet)(spi_packet_parts_s packet, bool ls_pa, uint word_count);
 }spi_functions_s;
 
 //  build_packet will use spi_packet_parts to build a SPa or LPa.
@@ -163,66 +168,11 @@ uint64_t lpa_build_packet(spi_packet_parts_s *parts, uint word_count){
         return;
 }
 
-func_ack build_DI(spi_packet_parts_s *part_buffer, uint8_t SPa_Parameter){
+*/
 
-    //  ili9488 device code for virtual channel is always 0b00.
-    part_buffer->Data_Id = SPa_Parameter;
+/*
 
-    return packet_part;
-}
-
-func_ack build_word_count(spi_packet_parts_s *parts_buffer, uint8_t LPa_Parameter){
-
-    parts_buffer->Word_Count_LSB = LPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_DZero(spi_packet_parts_s *part_buffer, uint8_t SPa_Parameter){
-
-    part_buffer->Data_Zero = SPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_DOne(spi_packet_parts_s *part_buffer, uint8_t SPa_Parameter){
-
-    part_buffer->Data_One = SPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_DTwo(spi_packet_parts_s *part_buffer, uint8_t LPa_Parameter){
-
-    part_buffer->Data_Two = LPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_DThree(spi_packet_parts_s *part_buffer, uint8_t LPa_Parameter){
-
-    part_buffer->Data_Three = LPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_DFour(spi_packet_parts_s *part_buffer, uint8_t LPa_Parameter){
-
-    part_buffer->Data_Four = LPa_Parameter;
-
-    return packet_part;
-}
-
-func_ack build_Ecc(spi_packet_parts_s *packet_buffer, uint SPa_Parameter){
-    
-    packet_buffer->Ecc = SPa_Parameter;
-
-    return packet_part;
-
-}
-
-
-void SPI_send_packet(spi_packet_parts_s *packet_part, spi_vars *array, bool ls_pa, uint word_count){
+func_ack SPI_send_packet(spi_packet_parts_s *inst, bool ls_pa, uint word_count){
 
     uint8_t spi_out_buffer;
 
@@ -238,7 +188,7 @@ void SPI_send_packet(spi_packet_parts_s *packet_part, spi_vars *array, bool ls_p
 
             spi_out_buffer = 0x00;
                 spi_out_buffer += ((packet_part->send_packet & 0xFF000000) >> 24);
-            spi_write_blocking(array->instance, &array->spi_src, array->spi_len);
+            spi_write_blocking(inst->instance, &array->spi_src, array->spi_len);
             break;
 
           case 1:
@@ -520,7 +470,19 @@ void SPI_send_packet(spi_packet_parts_s *packet_part, spi_vars *array, bool ls_p
                 break;
       }
     }
+  
+  sleep_us(2);
+  uint8_t bytes = spi_write_read_blocking(pack->instance, pack->tx_buf, pack->rx_buf, pack->length);
+//  printf("Bytes Length: %u.\n", bytes);
+  sleep_us(2);
+
+  // check that bytes written/read match bytes in tx_buffer & rx_buffer
+  func_ack status = (bytes == pack->length) ? spi_ack : func_error;
+//  printf("Status: %i.\n", status);
+
+  return spi_ack;
+  
   }
 
-
+*/
 #endif

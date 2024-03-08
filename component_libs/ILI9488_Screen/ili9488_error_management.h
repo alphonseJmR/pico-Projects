@@ -14,7 +14,8 @@ typedef enum function_acknowledgement {
     packet_part,
     packet_built,
     pins_init_ack,
-    register_written
+    register_written,
+    ili_initialized
 
 }func_ack;
 

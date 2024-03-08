@@ -1,7 +1,6 @@
 #ifndef SPI_MANAGEMENT_H
 #define SPI_MANAGEMENT_H
 
-#include "ILI9488_PACKET_BUILDER.h"
 #include "ili9488_screen_commands.h"
 #include "ili9488_pin_management.h"
 #include "ili9488_error_management.h"
@@ -13,27 +12,15 @@
 #define len size_t
 #define baud uint32_t
 
-typedef struct spi_packet_s {
-    
-    spi_inst_t *instance;
-    const txb *tx_buf;
-    rxb *rx_buf;
-    baud rate;
-    len length;
-    uint8_t spi_func_status;
+#define get_0b_to_8b(x)   ((x & 0x000000FF))
+#define get_8b_to_16b(x)  ((x & 0x0000FF00))
+#define get_16b_to_24b(x) ((x & 0x00FF0000))
+#define get_24b_to_32b(x) ((x & 0xFF000000))
 
-}spi_packet_s;
+#define fun uint8_t
 
-typedef enum baudrates_s {
-
-  ONE_HUND_K = 100000,
-  TWO_FIFTY_K = 250000,
-  FIVE_HUND_K = 500000,
-  ONE_MBS = 1000000
-
-}baud_r;
-
-spi_packet_s packet_buffer(spi_packet_s *packet, spi_packet_parts_s *part, int buf_inc, bool l_s){    // bool l_s refers to LPA or SPA
+/*
+spi_packet_s packet_buffer(spi_packet_s *packet, spi_l_packet *part, int buf_inc, bool l_s){
 
   if(l_s == true){
 
@@ -117,7 +104,7 @@ spi_packet_s packet_buffer(spi_packet_s *packet, spi_packet_parts_s *part, int b
   }
   return *packet;
 }
-
+*/
 
 spi_packet_s spi_length(spi_packet_s *inst){
 
@@ -127,7 +114,7 @@ spi_packet_s spi_length(spi_packet_s *inst){
 }
 
 
-spi_packet_parts_s color_to_data(spi_packet_parts_s *parts, uint32_t color){
+spi_l_packet_s color_to_data(spi_l_packet_s *parts, uint32_t color){
 
 
   parts->Data_Zero = get_0b_to_8b(color);
@@ -157,24 +144,32 @@ func_ack deinitialize_spi_management(spi_inst_t *instance){
 }
 
 
-func_ack spi_managed_data_write(spi_packet_s *pack, spi_packet_parts_s *part, int parts, bool l_s) {
+func_ack spi_managed_data_write(spi_pins *pins, spi_packet_s *pack, spi_l_packet_s *part, uint8_t command) {
 
 //  printf("Length: %u.\n", len);
 //  printf("Tx Buffer: %02x.\n", tx_buffer);
   txb packet_buf;
-  
+  spi_length(pack);
+  uint8_t bytes;
+  uint8_t packet_length;
+  volatile uint32_t i;
+  bool lp_a;
 
-    for(int i = 0; i <= parts; i++){
+  packet_length = (spi_check_data_size(part));
+  lp_a = (packet_length > 2) ? false : true;
 
-      packet_buffer(pack, part, i, l_s);
-      spi_length(pack);
+    spi_write_read_blocking(pack->instance, command, 0, 0);
+    for(i = 0; i < 0xFF; i++);
+
+    csn_put_high(pins->csn);
+    for(int i = 0; i <= packet_length; i++){
+
+    packet_buffer(pack, part, i, lp_a);
+      ili_delay(100);
+    bytes = spi_write_read_blocking(pack->instance, pack->tx_buf, pack->rx_buf, pack->length);
+  for(i = 0; i < 0x5F; i++);
 
     }
-
-  sleep_us(2);
-  uint8_t bytes = spi_write_read_blocking(pack->instance, pack->tx_buf, pack->rx_buf, pack->length);
-//  printf("Bytes Length: %u.\n", bytes);
-  sleep_us(2);
 
   // check that bytes written/read match bytes in tx_buffer & rx_buffer
   func_ack status = (bytes == pack->length) ? spi_ack : func_error;
@@ -184,7 +179,7 @@ func_ack spi_managed_data_write(spi_packet_s *pack, spi_packet_parts_s *part, in
 }
 
 
-func_ack spi_managed_command_write(spi_packet_s *packet, spi_packet_parts_s *part, uint8_t command, uint8_t param, uint8_t size){
+func_ack spi_managed_command_write(spi_packet_s *packet, spi_l_packet_s *part, uint8_t command, uint8_t param, uint8_t size){
 
   uint8_t bytes;
   fun stat;
@@ -238,7 +233,7 @@ func_ack spi_managed_command_write(spi_packet_s *packet, spi_packet_parts_s *par
 }
 
 
-uint8_t spi_check_data_size(spi_packet_parts_s *parts){
+uint8_t spi_check_data_size(spi_l_packet_s *parts){
 
   uint8_t packet_size;
   //  packet_size is a minimum of two data, data_zero and data_one.
@@ -261,14 +256,18 @@ uint8_t spi_check_data_size(spi_packet_parts_s *parts){
 }
 
 
-func_ack managed_data_spi(spi_packet_s *packet, spi_packet_parts_s *part){
+spi_l_packet_s data_break(spi_l_packet_s *parts, uint16_t data_in){
+
+  parts->Data_Zero = get_0b_to_8b(data_in);
+  parts->Data_One = get_8b_to_16b(data_in);
+
+  return *parts;
+}
+
+
+func_ack managed_data_spi(spi_pins *pins, spi_packet_s *packet, spi_l_packet_s *part, uint8_t command){
 
   uint8_t fun_stat;
-  uint8_t data_size;
-  bool smol_packet;
-
-  data_size = spi_check_data_size(part);
-  smol_packet = (data_size > 2) ? false : true;
 
     packet->spi_func_status = 0;
 
@@ -277,7 +276,7 @@ func_ack managed_data_spi(spi_packet_s *packet, spi_packet_parts_s *part){
         sleep_us(3);
 
     //  Initialize data transfer.
-    packet->spi_func_status += spi_managed_transfer(packet, part, data_size, smol_packet);
+    packet->spi_func_status += spi_managed_data_write(pins, packet, part, command);
         sleep_us(3);
 
     //  Deinitialize communication.
@@ -290,7 +289,7 @@ func_ack managed_data_spi(spi_packet_s *packet, spi_packet_parts_s *part){
 }
 
 
-func_ack managed_command_spi(spi_packet_s *packet, spi_packet_parts_s *parts, fun command, fun param, fun size){
+func_ack managed_command_spi(spi_packet_s *packet, spi_l_packet_s *parts, fun command, fun param, fun size){
   
   uint8_t fun_stat;
   packet->spi_func_status = 0;
@@ -308,7 +307,6 @@ func_ack managed_command_spi(spi_packet_s *packet, spi_packet_parts_s *parts, fu
   
   return fun_stat;
 }
-
 
 
 #endif

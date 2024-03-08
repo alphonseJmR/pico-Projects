@@ -3,6 +3,65 @@
 
 #include <stdio.h>
 
+typedef enum baudrates_s {
+
+  ONE_HUND_K = 100000,
+  TWO_FIFTY_K = 250000,
+  FIVE_HUND_K = 500000,
+  ONE_MBS = 1000000
+
+}baud_r;
+
+typedef enum pin_logic_level {
+    LOW = 0,
+    HIGH
+}p_logic_l;
+
+typedef enum spi_zero_zero {
+
+spi_rx_zz = 0,
+spi_csn_zz = 1,
+spi_sck_zz = 2,
+spi_tx_zz = 3
+
+}spi_zz;
+
+typedef enum spi_zero_one {
+
+spi_rx_zo = 4,
+spi_csn_zo = 5,
+spi_sck_zo = 6,
+spi_tx_zo = 7
+
+}spi_zo;
+
+typedef enum spi_one_zero {
+
+spi_rx_oz = 8,
+spi_csn_oz = 9,
+spi_sck_oz = 10,
+spi_tx_oz = 11
+
+}spi_oz;
+
+typedef enum spi_one_one {
+
+spi_rx_oo = 12,
+spi_csn_oo = 13,
+spi_sck_oo = 14,
+spi_tx_oo = 15
+
+}spi_oo;
+
+typedef enum spi_zero_two {
+
+spi_rx_zt = 16,
+spi_csn_zt = 17,
+spi_sck_zt = 18,
+spi_tx_zt = 19
+
+}spi_zt;
+
 
 //________________________________________________________________________________
 //  Ilitek ILI9488 a-Si TFT LCD Single Chip Driver commands start: page 140.
@@ -178,6 +237,34 @@
 #define COLOR_ORANGE         (0xFFA500u)
 #define COLOR_SNOW           (0xFFFAFAu)
 #define COLOR_YELLOW         (0xFFFF00u)
+
+#define ili_VC 0x00                 //  The ili9488 virtual channel is only 0b00.
+#define other_device_VC 0x01        //  !! Not an actual name setting, however, correct value.
+#define other_device_one_VC 0x10    //  !! Not an actual name setting, however, correct value.
+#define other_device_tw_VC 0x11     //  !! Not an actual name setting, however, correct value.
+
+#define SPa 0x15
+#define LPa 0x29
+
+#define ECC 0x00
+#define CS 0x00
+
+#define SPa_EOTP 0x08
+#define SPa_DCSWN_S 0x05
+#define SPa_DCSW_OS 0x15
+#define SPa_DCSRN_S 0x06
+#define SPa_SMRPS_S 0x37
+#define SPa_AwER 0x02
+#define SPa_DCSRR_OS 0x21
+#define SPA_DCSRR_TS 0x22
+#define LPa_NP_L 0x09
+#define LPa_DCSW_L 0x39
+#define LPa_DCSRR_L 0x1C
+
+#define LPA false
+#define SPA true
+
+#define ili9488_device code (0x9488u)
 
 
 

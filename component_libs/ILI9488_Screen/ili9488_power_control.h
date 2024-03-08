@@ -11,7 +11,7 @@ uint8_t VRH_ONE[32] = {
     0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D,
     0x1E, 0x1F
 
-}
+};
 
 //  Hex values for negative gamma control.
 uint8_t VRH_TWO[32] = {
@@ -23,10 +23,10 @@ uint8_t VRH_TWO[32] = {
     0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D,
     0x1E, 0x1F
 
-}
+};
 
 //  (VCL x 2) | (-(VCL x 2) | - VCL | VCL x (6,5,4) | (-VCL x 5, 4, 5, 4, 3, 4, 3))
-typedef enum step_up_factor = {
+typedef enum step_up_factor {
 
     HIGH_VCL = 0X00,
     HIGH_LOW_VCL = 0X01,
@@ -37,9 +37,9 @@ typedef enum step_up_factor = {
     LOW_HIGH_VCL = 0X06,
     LOW_LOW_VCL = 0X07
 
-};
+}step_up;
 
-typedef enum DCA_zero_N = {
+typedef enum DCA_zero_N {
 
     ONE_EIGHTH_H = 0X00,
     ONE_QUARTER_H = 0X01,
@@ -47,16 +47,16 @@ typedef enum DCA_zero_N = {
     ONE_H = 0X03,
     TWO_H = 0X04
 
-};
+}DCA_z;
 
-typedef enum DCA_one_N = {
-    ONE_HALF_H = 0X00,
-    ONE_H = 0X10,
-    TWO_H = 0X20,
+typedef enum DCA_one_N {
+    ONE_HALF_H_ONE = 0X00,
+    ONE_H_ONE = 0X10,
+    TWO_H_ONE = 0X20,
     FOUR_H = 0X30,
     EIGHT_H = 0X40
 
-};
+}DCA_o;
 
 
 

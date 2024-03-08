@@ -2,59 +2,11 @@
 #define ILI9488_PIN_MANAGEMENT
 
 #include <stdio.h>
+#include "ili9488_func_def.h"
 #include "hardware/gpio.h"
 #include "ili9488_error_management.h"
 #include "spi_management.h"
 
-typedef enum pin_logic_level {
-    LOW = 0,
-    HIGH
-}p_logic_l;
-
-typedef enum spi_zero_zero {
-
-spi_rx_zz = 0,
-spi_csn_zz = 1,
-spi_sck_zz = 2,
-spi_tx_zz = 3
-
-}spi_zz;
-
-typedef enum spi_zero_one {
-
-spi_rx_zo = 4,
-spi_csn_zo = 5,
-spi_sck_zo = 6,
-spi_tx_zo = 7
-
-}spi_zo;
-
-typedef enum spi_one_zero {
-
-spi_rx_oz = 8,
-spi_csn_oz = 9,
-spi_sck_oz = 10,
-spi_tx_oz = 11
-
-}spi_oz;
-
-typedef enum spi_one_one {
-
-spi_rx_oo = 12,
-spi_csn_oo = 13,
-spi_sck_oo = 14,
-spi_tx_oo = 15
-
-}spi_oo;
-
-typedef enum spi_zero_two {
-
-spi_rx_zt = 16,
-spi_csn_zt = 17,
-spi_sck_zt = 18,
-spi_tx_zt = 19
-
-}spi_zt;
 
 typedef struct spi_pin_manager_s {
 
@@ -65,7 +17,6 @@ typedef struct spi_pin_manager_s {
 
     uint dc_rs;
     uint led_bl;
-    struct spi_pin_groups_s;
 
 }spi_pins;
 
@@ -209,7 +160,6 @@ func_ack user_pin_initialize(spi_packet_s *inst, spi_pins *pins){
 
     fun_status = general_ack;
 
-
     exit_status = ((configure_status == pins_ack) && (fun_status == general_ack)) ? pins_init_ack : func_error;
 
         return exit_status;
@@ -274,9 +224,5 @@ func_ack selector(bool csn, bool dc_rs, bool enable, spi_pins *pins){
     return general_ack;
 
 }
-
-
-
-
 
 #endif

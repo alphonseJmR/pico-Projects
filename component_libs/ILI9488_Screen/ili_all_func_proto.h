@@ -28,6 +28,8 @@
 #define fud uint16_t
 #define crud uint32_t
 
+#define max_iterations (int)(ILI_LCD_WIDTH * ILI_LCD_HEIGHT)
+
 //  Large character set.  Keep collapsed.
 const fun charset10x14[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -363,7 +365,7 @@ spi_packet_s data_packet = {
   .tx_buf = 0,
   .rx_buf = 0,
   .length = 0,
-  .rate = 0,
+  .rate = ONE_MBS,
   .spi_func_status = 0
 
 };
@@ -398,10 +400,10 @@ spi_pins my_pins = {
 
   .miso = GPIO_FOUR,
   .csn = GPIO_FIVE,
-  .sck = GPIO_SIX,
-  .mosi = GPIO_SEVEN,
-  .dc_rs = GPIO_TWO,
-  .led_bl = GPIO_THREE
+  .sck = GPIO_TWO,
+  .mosi = GPIO_THREE,
+  .dc_rs = GPIO_ZERO,
+  .led_bl = GPIO_FIFTEEN
 
   };
 
@@ -415,19 +417,20 @@ void csn_put_high(fun csn);
 void csn_put_low(fun csn);
 void dcrs_put_high(fun ce);
 void dcrs_put_low(fun ce);
-func_ack selector(bool csn, bool dc_rs, bool enable, spi_pins *pins);
 
 
 //  Function Prototypes from spi_management.h
 func_ack initialize_spi_management(spi_inst_t *instance, uint32_t baudrate);
 func_ack deinitialize_spi_management(spi_inst_t *instance);
 fun spi_length(spi_packet_s *inst, fun input);
-fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_one, fun p_two, fun p_three, fun p_four, fun ecc);
-fun spi_spa_command_write(spi_packet_s *inst, fun command, fun p_one, fun ecc);
-fun spi_lpa_data_write(spi_packet_s *inst, fun command, fun data_one, fun data_two, fun data_three, fun data_four, fun ecc);
-fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc);
+fun spi_lpa_command_write(spi_packet_s *inst, fun data_t, fun command, fun num_param, fun p_one, fun p_two, fun p_three, fun p_four, fun ecc);
+fun spi_spa_command_write(spi_packet_s *inst, fun data_t, fun command, fud p_one, fun ecc);
+fun spi_lpa_data_write(spi_packet_s *inst, fun data_t, fun command, fud data_one, fud data_three, fun ecc);
+fun spi_spa_data_write(spi_packet_s *inst, fun data_t, fun command, fud data, fun ecc);
+fun spi_read_data(spi_packet_s *inst);
 spi_part_s data_break(spi_part_s *parts, uint16_t data_in);
 spi_part_s color_to_data(spi_part_s *parts, uint32_t color);
+fun data_header(fun data_t);
 /*
 func_ack spi_managed_data_write(spi_pins *pins, spi_packet_s *pack, spi_part_s *part, fun command);
 func_ack managed_data_spi(spi_pins *pins, spi_packet_s *packet, spi_part_s *part, fun command);
@@ -438,20 +441,20 @@ func_ack spi_managed_command_write(spi_packet_s *packet, spi_part_s *part, fun c
 
 //  Function Prototype from func_def.h
 func_ack ili_delay(uint32_t wait_value);
-func_ack ili_write_ram_prep(spi_packet_s *packet, fun command, fun param);
-func_ack ili_write_ram(spi_packet_s *packet, fun command, uint32_t color);
-func_ack ili_register_write(spi_packet_s *packet, fun command, fud data, crud l_data);
+func_ack ili_write_ram_prep(spi_packet_s *packet, fun data_t, fun command, fun param);
+func_ack ili_write_ram(spi_packet_s *packet, fun data_t, fun command, uint32_t color);
+func_ack ili_register_write(spi_packet_s *packet, fun data_t, fun command, fud data, crud l_data);
 func_ack ili_check_coords(fun_coo *coords);
-func_ack ili_set_display_dir(spi_packet_s *pack, bool direction);
-func_ack ili_set_window(ili9488_window_var_s *window, spi_packet_s *pack, spi_part_s *parts);
-func_ack ili_set_foreground_color(ili9488_window_var_s *window, spi_packet_s *pack, uint32_t color_i);
-func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, spi_packet_s *pack);
-func_ack ili_fill(uint32_t color, spi_packet_s *pack);
-func_ack ili_draw_pixel(uint32_t x, uint32_t y, spi_part_s *parts, spi_packet_s *pack);
-func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_part_s *parts, spi_packet_s *pack);
-func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s *window, spi_part_s *parts, spi_pins *pins, spi_packet_s *pack);
-func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts, spi_packet_s *pack);
-func_ack ili_draw_string(uint32_t x, uint32_t y, fun *string_ptr, spi_part_s *parts, spi_packet_s *pack);
+func_ack ili_set_display_dir(spi_packet_s *pack, fun data_t, bool direction);
+func_ack ili_set_window(ili9488_window_var_s *window, fun data_t, spi_packet_s *pack, spi_part_s *parts);
+func_ack ili_set_foreground_color(ili9488_window_var_s *window, fun data_t, spi_packet_s *pack, uint32_t color_i);
+func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, fun data_t, spi_packet_s *pack);
+func_ack ili_fill(uint32_t color, fun data_t, spi_packet_s *pack);
+func_ack ili_draw_pixel(uint32_t x, uint32_t y, spi_part_s *parts, fun data_t, spi_packet_s *pack);
+func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_part_s *parts, fun data_t, spi_packet_s *pack);
+func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s *window, spi_part_s *parts, fun data_t, spi_pins *pins, spi_packet_s *pack);
+func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts, fun data_t, spi_packet_s *pack);
+func_ack ili_draw_string(uint32_t x, uint32_t y, fun *string_ptr, spi_part_s *parts, fun data_t, spi_packet_s *pack);
 
 
 func_ack ili_delay(uint32_t wait_value){
@@ -467,6 +470,26 @@ uint32_t i;
   }
 
   return general_ack;
+}
+
+fun spi_read_data(spi_packet_s *inst){
+
+    printf("Attempting to read ILI9488 Device ID.\n");
+    fun *dev_id;
+    fun device;
+    device = 0;
+
+    csn_put_high(my_pins.csn);
+    dcrs_put_low(my_pins.dc_rs);
+    spi_read_blocking(inst->instance, 0, (dev_id), 2);
+    csn_put_low(my_pins.csn);
+
+    device = *dev_id;
+
+    (device > 0) ? printf("Device ID: 0x%04x.\n", device) : printf("Error Reading from ILI9488.\n");
+
+    return (device > 0) ? device : 0x0000;
+
 }
 
 
@@ -516,6 +539,7 @@ static func_ack pin_validate(spi_pins *pins) {
 spi_packet_s configure_instance(spi_packet_s *instance, spi_pins *pins){
 
   printf("Configuring SPI Instance.\n");
+  printf("Checking User Set MISO Pin: %i.\n", pins->miso);
 
   if(pins->miso == 0){
     instance->instance = spi0;
@@ -555,21 +579,20 @@ func_ack pin_manager_configure(spi_packet_s *packet, spi_pins *pins) {
 
   configure_instance(packet, pins);
 
-  if (status == 2)
-  {
     // set GPIO function as SPI for SCK, MOSI & MISO & CSN
     gpio_set_function(pins->sck, GPIO_FUNC_SPI);
     gpio_set_function(pins->mosi, GPIO_FUNC_SPI);
     gpio_set_function(pins->miso, GPIO_FUNC_SPI);
+    gpio_set_function(pins->csn, GPIO_FUNC_SPI);
 
     // initialise CE & CSN
-    gpio_init(pins->csn);
+  //  gpio_init(pins->csn);
     gpio_init(pins->dc_rs);
 
     // set direction for CE & CSN
-    gpio_set_dir(pins->csn, GPIO_OUT);
+  //  gpio_set_dir(pins->csn, GPIO_OUT);
     gpio_set_dir(pins->dc_rs, GPIO_OUT);
-  }
+  
   }else{
 
     printf("Pins not valid.\n");
@@ -589,11 +612,18 @@ func_ack user_pin_initialize(spi_packet_s *inst, spi_pins *pins){
     func_ack fun_status;
     func_ack configure_status;
     func_ack exit_status;
+    fud rate_running;
 
     printf("\nUser Defined Pins:\n\n\tMosi: %i\n\tMiso: %i\n\tSck: %i\n\tCSN: %i\n\tDC-RS: %i\n\n", pins->mosi, pins->miso, pins->sck, pins->csn, pins->dc_rs);
 
     configure_status = pin_manager_configure(inst, pins);
     printf("Configured: %s.\n", ((configure_status != 0) ? "Yes" : "No") );
+
+    printf("Initialize SPI Protocol Parameters.\n");
+
+    rate_running = spi_init(inst->instance, inst->rate);
+
+    printf("Baudrate: 0x%08x.\n", rate_running);
 
     fun_status = general_ack;
 
@@ -622,6 +652,8 @@ void csn_put_low(fun csn) {
 
 void dcrs_put_high(fun ds) {
 
+  printf("Putting Pin: %i.\n", ds);
+
   gpio_put(ds, HIGH);
 
   return;
@@ -641,11 +673,11 @@ fun spi_length(spi_packet_s *inst, fun input){
   fun sized;
   sized = 0x00;
 
-  printf("Checking length.\n");
+//  printf("Checking length.\n");
 
   sized = (sizeof(input) / sizeof(txb));
 
-  printf("Length: %i.\n", sized);
+//  printf("Length: %i.\n", sized);
 
   return sized;
 }
@@ -665,7 +697,7 @@ spi_part_s color_to_data(spi_part_s *parts, uint32_t color){
 
 func_ack initialize_spi_management(spi_inst_t *instance, uint32_t baudrate){
 
-  printf("\nInitialize SPI Management.\n");
+//  printf("\nInitialize SPI Management.\n");
 
       // initialise SPI instance at the specified baudrate (Hz).
   spi_init(instance, baudrate);
@@ -676,7 +708,7 @@ func_ack initialize_spi_management(spi_inst_t *instance, uint32_t baudrate){
 
 func_ack deinitialize_spi_management(spi_inst_t *instance){
 
-  printf("\nDeinitialize SPI Management.\n");
+//  printf("\nDeinitialize SPI Management.\n");
     
     // Deinitialize SPI instance.  
   spi_deinit(instance);
@@ -685,14 +717,28 @@ func_ack deinitialize_spi_management(spi_inst_t *instance){
 }
 
 
-fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_one, fun p_two, fun p_three, fun p_four, fun ecc){
+fun data_header(uint8_t data_type){
 
+  fun header;
+  header = 0x00;
+
+  header += ((ili_VC) & (data_type));
+
+//  printf("Current Data Type: 0x%02x.\n", header);
+
+  return header;
+}
+
+fun spi_lpa_command_write(spi_packet_s *inst, fun data_t, fun command, fun num_param, fun p_one, fun p_two, fun p_three, fun p_four, fun ecc){
+
+  fun dt;
   fun *comm_ptr;
   fun *po_ptr;
   fun *pt_ptr;
   fun *pth_ptr;
   fun *pf_ptr;
   fun *ecc_ptr;
+  fun *dt_ptr;
 
   fun return_bytes;
   fun final_bytes;
@@ -704,16 +750,25 @@ fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_
   *pf_ptr = p_four;
   *ecc_ptr = ecc;
 
-  printf("Updated SPI Command Write Function.\n");
+  dt = 0;
+
+  printf("\n\nUpdated SPI LPA Command Write Function.\n");
   data_break(&my_parts, num_param);
 
   initialize_spi_management(inst->instance, inst->rate);
 
   csn_put_low(my_pins.csn);
-  dcrs_put_high(my_pins.dc_rs);
+  dcrs_put_low(my_pins.dc_rs);
+
+  dt = data_header(data_t);
+  *dt_ptr = dt;
+
+  inst->length = spi_length(inst, dt);
+  return_bytes = spi_write_blocking(inst->instance, dt_ptr, inst->length);
+  final_bytes += return_bytes;
 
   inst->length = spi_length(inst, command);
-  return_bytes = spi_write_read_blocking(inst->instance, comm_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, comm_ptr, inst->length);
   final_bytes += return_bytes;
 
   for(int i = 0; i < 2; i++){
@@ -721,20 +776,20 @@ fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_
     if(i == 0){
 
     inst->length = spi_length(inst, my_parts.Data_Zero);
-    return_bytes = spi_write_read_blocking(inst->instance, &my_parts.Data_Zero, 0, inst->length);
+    return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Zero, inst->length);
     final_bytes += return_bytes;
 
     }else if(i == 1){
 
     inst->length = spi_length(inst, my_parts.Data_One);
-    return_bytes = spi_write_read_blocking(inst->instance, &my_parts.Data_One, 0, inst->length);
+    return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_One, inst->length);
     final_bytes += return_bytes;
 
     }
   }
 
   inst->length = spi_length(inst, ecc);
-  return_bytes = spi_write_read_blocking(inst->instance, ecc_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, ecc_ptr, inst->length);
   final_bytes += return_bytes;
 
     if(num_param != 0){
@@ -744,25 +799,25 @@ fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_
       if(i == 0){
            
         inst->length = spi_length(inst, p_one);
-        return_bytes = spi_write_read_blocking(inst->instance, po_ptr, 0, inst->length);
+        return_bytes = spi_write_blocking(inst->instance, po_ptr, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 1){
 
         inst->length = spi_length(inst, p_two);
-        return_bytes = spi_write_read_blocking(inst->instance, pt_ptr, 0, inst->length);
+        return_bytes = spi_write_blocking(inst->instance, pt_ptr, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 2){
 
         inst->length = spi_length(inst, p_three);
-        return_bytes = spi_write_read_blocking(inst->instance, pth_ptr, 0, inst->length);
+        return_bytes = spi_write_blocking(inst->instance, pth_ptr, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 3){
 
         inst->length = spi_length(inst, p_four);
-        return_bytes = spi_write_read_blocking(inst->instance, pf_ptr, 0, inst->length);
+        return_bytes = spi_write_blocking(inst->instance, pf_ptr, inst->length);
         final_bytes += return_bytes;
 
       }
@@ -776,118 +831,134 @@ fun spi_lpa_command_write(spi_packet_s *inst, fun command, fun num_param, fun p_
   deinitialize_spi_management(inst->instance);
 
   csn_put_high(my_pins.csn);
-  dcrs_put_high(my_pins.dc_rs);
 
   return final_bytes;
 
 }
 
 
-fun spi_spa_command_write(spi_packet_s *inst, fun command, fun p_one, fun ecc){
+fun spi_spa_command_write(spi_packet_s *inst, fun data_t, fun command, fud p_one, fun ecc){
 
+  fun dt;
   fun *comm_ptr;
-  fun *po_ptr;
   fun *ecc_ptr;
+  fun *dt_ptr;
 
   fun return_bytes;
   fun final_bytes;
 
+  dt = 0;
   *comm_ptr = command;
-  *po_ptr = p_one;
   *ecc_ptr = ecc;
 
-  printf("Updated SPI Command Write Function.\n");
+  data_break(&my_parts, p_one);
 
+  printf("\n\nUpdated SPI SPA Command Write Function.\n");
+
+  dt = data_header(data_t);
+  *dt_ptr = dt;
+  
   initialize_spi_management(inst->instance, inst->rate);
 
   csn_put_high(my_pins.csn);
   dcrs_put_low(my_pins.dc_rs);
 
+    inst->length = spi_length(inst, dt);
+  return_bytes = spi_write_blocking(inst->instance, dt_ptr, inst->length);
+  final_bytes += return_bytes;
+
   inst->length = spi_length(inst, command);
-  return_bytes = spi_write_read_blocking(inst->instance, comm_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, comm_ptr, inst->length);
   final_bytes += return_bytes;
 
   if(p_one != 0){
 
   inst->length = spi_length(inst, p_one);
-  return_bytes = spi_write_read_blocking(inst->instance, po_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Zero, inst->length);
+  final_bytes += return_bytes;
+
+  inst->length = spi_length(inst, p_one);
+  return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_One, inst->length);
   final_bytes += return_bytes;
 
   }
 
   inst->length = spi_length(inst, ecc);
-  return_bytes = spi_write_read_blocking(inst->instance, ecc_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, ecc_ptr, inst->length);
   final_bytes += return_bytes;
   printf("Final Bytes Transmitted: %i.\n", final_bytes);
 
   deinitialize_spi_management(inst->instance);
 
-    csn_put_low(my_pins.csn);
-  dcrs_put_high(my_pins.dc_rs);
+    csn_put_high(my_pins.csn);
 
   return final_bytes;
 
 }
 
 
-fun spi_lpa_data_write(spi_packet_s *inst, fun command, fun data_one, fun data_two, fun data_three, fun data_four, fun ecc){
+fun spi_lpa_data_write(spi_packet_s *inst, fun data_t, fun command, fud data_one, fud data_three, fun ecc){
 
-
+  fun dt;
   fun *command_ptr;
-  fun *data_one_ptr;
-  fun *data_two_ptr;
-  fun *data_three_ptr;
-  fun *data_four_ptr;
   fun *ecc_ptr;
+  fun *dt_ptr;
 
+  dt = 0;
   fun return_bytes;
   fun final_bytes;
   fun data_length;
 
+  data_break(&my_parts, data_one);
+  data_break(&my_parts, data_three);
+
   *command_ptr = (command != 0) ? command : 0;
-  *data_one_ptr = (data_one != 0) ? data_one : 0;
-  *data_two_ptr = (data_two != 0) ? data_two : 0;
-  *data_three_ptr = (data_three != 0) ? data_three : 0;
-  *data_four_ptr = (data_four != 0) ? data_four : 0;
   *ecc_ptr = ecc;
 
   data_length = 0x00;
 
-  data_length += (data_one != 0) ? 0x01 : 0;
-  data_length += (data_two != 0) ? 0x01 : 0;
-  data_length += (data_three != 0) ? 0x01 : 0;
-  data_length += (data_four != 0) ? 0x01 : 0;
+  data_length += (my_parts.Data_Zero != 0) ? 0x01 : 0;
+  data_length += (my_parts.Data_One != 0) ? 0x01 : 0;
+  data_length += (my_parts.Data_Two != 0) ? 0x01 : 0;
+  data_length += (my_parts.Data_Four != 0) ? 0x01 : 0;
 
-  printf("Updated SPI Command Write Function.\n");
+  dt = data_header(data_t);
+  *dt_ptr = dt;
+
+  printf("\n\nUpdated SPI LPA Data Write Function.\n");
 
   initialize_spi_management(inst->instance, inst->rate);
 
   csn_put_low(my_pins.csn);
-  dcrs_put_low(my_pins.dc_rs);
+  dcrs_put_high(my_pins.dc_rs);
+
+    inst->length = spi_length(inst, dt);
+  return_bytes = spi_write_blocking(inst->instance, dt_ptr, inst->length);
+  final_bytes += return_bytes;
 
   inst->length = spi_length(inst, command);
-  return_bytes = spi_write_read_blocking(inst->instance, command_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, command_ptr, inst->length);
   final_bytes += return_bytes;
 
   for(int i = 0; i < 2; i++){
 
     if(i == 0){
 
-    inst->length = spi_length(inst, data_one);
-    return_bytes = spi_write_read_blocking(inst->instance, data_one_ptr, 0, inst->length);
+    inst->length = spi_length(inst, my_parts.Data_Zero);
+    return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Zero, inst->length);
     final_bytes += return_bytes;
 
     }else if(i == 1){
 
     inst->length = spi_length(inst, my_parts.Data_One);
-    return_bytes = spi_write_read_blocking(inst->instance, data_two_ptr, 0, inst->length);
+    return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_One, inst->length);
     final_bytes += return_bytes;
 
     }
   }
 
   inst->length = spi_length(inst, ecc);
-  return_bytes = spi_write_read_blocking(inst->instance, ecc_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, ecc_ptr, inst->length);
   final_bytes += return_bytes;
 
     if(data_length != 0){
@@ -896,26 +967,26 @@ fun spi_lpa_data_write(spi_packet_s *inst, fun command, fun data_one, fun data_t
 
       if(i == 0){
            
-        inst->length = spi_length(inst, data_one);
-        return_bytes = spi_write_read_blocking(inst->instance, data_one_ptr, 0, inst->length);
+        inst->length = spi_length(inst, my_parts.Data_Zero);
+        return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Zero, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 1){
 
-        inst->length = spi_length(inst, data_two);
-        return_bytes = spi_write_read_blocking(inst->instance, data_two_ptr, 0, inst->length);
+        inst->length = spi_length(inst, my_parts.Data_One);
+        return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_One, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 2){
 
-        inst->length = spi_length(inst, data_three);
-        return_bytes = spi_write_read_blocking(inst->instance, data_three_ptr, 0, inst->length);
+        inst->length = spi_length(inst, my_parts.Data_Two);
+        return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Two, inst->length);
         final_bytes += return_bytes;
 
       }else if(i == 3){
 
-        inst->length = spi_length(inst, data_four);
-        return_bytes = spi_write_read_blocking(inst->instance, data_four_ptr, 0, inst->length);
+        inst->length = spi_length(inst, my_parts.Data_Three);
+        return_bytes = spi_write_blocking(inst->instance, &my_parts.Data_Three, inst->length);
         final_bytes += return_bytes;
 
       }
@@ -930,26 +1001,27 @@ fun spi_lpa_data_write(spi_packet_s *inst, fun command, fun data_one, fun data_t
   deinitialize_spi_management(inst->instance);
 
   csn_put_high(my_pins.csn);
-  dcrs_put_high(my_pins.dc_rs);
 
   return final_bytes;
 
 }
 
 
-fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc){
+fun spi_spa_data_write(spi_packet_s *inst, fun data_t, fun command, fud data, fun ecc){
 
-
+  fun dt;
   fun *coms_ptr;
   fun *data_break_zero;
   fun *data_break_one;
   fun *ec_ptr;
+  fun *dt_ptr;
 
   fun return_bytes;
   fun final_bytes;
 
   data_break(&my_parts, data);
 
+  dt = 0;
   *coms_ptr = command;
   *data_break_zero = my_parts.Data_Zero;
   *data_break_one = my_parts.Data_One;
@@ -957,13 +1029,20 @@ fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc){
 
   printf("Updated SPI Data SPA Write Function.\n");
 
+  dt = data_header(data_t);
+  *dt_ptr = dt;
+
   initialize_spi_management(inst->instance, inst->rate);
 
   csn_put_low(my_pins.csn);
-  dcrs_put_low(my_pins.dc_rs);
+  dcrs_put_high(my_pins.dc_rs);
+
+  inst->length = spi_length(inst, dt);
+  return_bytes = spi_write_blocking(inst->instance, dt_ptr, inst->length);
+  final_bytes += return_bytes;
 
   inst->length = spi_length(inst, command);
-  return_bytes = spi_write_read_blocking(inst->instance, coms_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, coms_ptr, inst->length);
   final_bytes += return_bytes;
 
   if(data != 0){
@@ -973,14 +1052,14 @@ fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc){
       if(i == 0){
 
     inst->length = spi_length(inst, my_parts.Data_Zero);
-    return_bytes = spi_write_read_blocking(inst->instance, data_break_zero, 0, inst->length);
+    return_bytes = spi_write_blocking(inst->instance, data_break_zero, inst->length);
     final_bytes += return_bytes;
 
       }else if(i == 1){
 
 
     inst->length = spi_length(inst, my_parts.Data_One);
-    return_bytes = spi_write_read_blocking(inst->instance, data_break_one, 0, inst->length);
+    return_bytes = spi_write_blocking(inst->instance, data_break_one, inst->length);
     final_bytes += return_bytes;
 
       }
@@ -989,14 +1068,13 @@ fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc){
   }
 
   inst->length = spi_length(inst, ecc);
-  return_bytes = spi_write_read_blocking(inst->instance, ec_ptr, 0, inst->length);
+  return_bytes = spi_write_blocking(inst->instance, ec_ptr, inst->length);
   final_bytes += return_bytes;
   printf("Final Bytes Transmitted: %i.\n", final_bytes);
 
   deinitialize_spi_management(inst->instance);
 
   csn_put_high(my_pins.csn);
-  dcrs_put_high(my_pins.dc_rs);
 
   return final_bytes;
 
@@ -1005,7 +1083,7 @@ fun spi_spa_data_write(spi_packet_s *inst, fun command, fud data, fun ecc){
 
 spi_part_s data_break(spi_part_s *parts, uint16_t data_in){
 
-  printf("Breaking data: 0x%04x.\n", data_in);
+//  printf("Breaking data: 0x%04x.\n", data_in);
 
   parts->Data_Zero = 0x00;
   parts->Data_One = 0x00;
@@ -1021,14 +1099,13 @@ spi_part_s data_break(spi_part_s *parts, uint16_t data_in){
 }
 
 
-func_ack ili_write_ram_prep(spi_packet_s *packet, fun command, fun param){
+func_ack ili_write_ram_prep(spi_packet_s *packet, fun data_t, fun command, fun param){
+
+// printf("RAM Prep.\n");
 
   fun byte_return;
 
-    csn_put_low(my_pins.csn);
-    dcrs_put_high(my_pins.dc_rs);
-
-    byte_return = spi_spa_command_write(packet, command, param, 0);
+    byte_return = spi_spa_command_write(packet, data_t, command, param, 0);
     
   //  spi_managed_command_write(packet, part, Memory_Write, 0, 0);
 
@@ -1036,10 +1113,12 @@ func_ack ili_write_ram_prep(spi_packet_s *packet, fun command, fun param){
 }
 
 
-func_ack ili_write_ram(spi_packet_s *packet, fun command, uint32_t color){
+func_ack ili_write_ram(spi_packet_s *packet, fun data_t, fun command, uint32_t color){
 
     fun stat;
     fun packet_size;
+
+  //  printf("Writing RAM.\n");
 
     color_to_data(&my_parts, color);
      packet_size += (my_parts.Data_One != 0) ? 0x01 : 0;
@@ -1047,27 +1126,24 @@ func_ack ili_write_ram(spi_packet_s *packet, fun command, uint32_t color){
      packet_size += (my_parts.Data_Three != 0) ? 0x01 : 0;
      packet_size += (my_parts.Data_Four != 0) ? 0x01 : 0;
 
-    stat += spi_lpa_command_write(packet, command, packet_size, my_parts.Data_Zero, my_parts.Data_One, my_parts.Data_Two, my_parts.Data_Three, 0);
-
-  //  stat += managed_command_spi(packet, part, 0, 0, d_size);
-
-    //  Stat should return spi_ack.
-
-
+    stat += spi_lpa_command_write(packet, data_t, command, packet_size, my_parts.Data_Zero, my_parts.Data_One, my_parts.Data_Two, my_parts.Data_Three, 0);
 
     return (stat > 0) ? ili_ack : func_error;
 }
 
 
-func_ack ili_register_write(spi_packet_s *packet, fun command, fud data, crud l_data){
+func_ack ili_register_write(spi_packet_s *packet, fun data_t, fun command, fud data, crud l_data){
 
-  printf("Ili Register Writing.\n");
+  printf("Ili Register Writing.\n\n");
 
     fun spa_bytes;
     fun lpa_bytes;
 
     fun pack_length;
     fun final_byte;
+
+    fud d_in_one;
+    fud d_in_two;
 
     spa_bytes = 0x00;
     lpa_bytes = 0x00;
@@ -1076,7 +1152,7 @@ func_ack ili_register_write(spi_packet_s *packet, fun command, fud data, crud l_
 
     if((data > 0) && l_data == 0){
 
-      spa_bytes += spi_spa_data_write(packet, command, data, 0);
+      spa_bytes += spi_spa_data_write(packet, data_t, command, data, 0);
       final_byte += spa_bytes;
 
 
@@ -1085,14 +1161,16 @@ func_ack ili_register_write(spi_packet_s *packet, fun command, fud data, crud l_
       data_break(&my_parts, (l_data & 0x0000FFFF));
       data_break(&my_parts, (l_data & 0xFFFF0000));
 
-    lpa_bytes = spi_lpa_data_write(packet, command, my_parts.Data_Zero, my_parts.Data_One, my_parts.Data_Two, my_parts.Data_Three, 0);
+      d_in_one += (my_parts.Data_Zero & my_parts.Data_One);
+      d_in_two += (my_parts.Data_Two & my_parts.Data_Three);
+
+    lpa_bytes = spi_lpa_data_write(packet, data_t, command, d_in_one, d_in_two, 0);
     final_byte += lpa_bytes;
 
     }
 
-    csn_put_high(my_pins.csn);
-
     final_byte = ((spa_bytes > 0) || (lpa_bytes > 0)) ? register_written : func_error;
+    printf("Final Bytes Written: %i.\n", final_byte);
 
     return final_byte;
 }
@@ -1134,7 +1212,7 @@ func_ack ili_check_coords(fun_coo *coords){
 }
 
 
-func_ack ili_set_display_dir(spi_packet_s *pack, bool direction){
+func_ack ili_set_display_dir(spi_packet_s *pack, fun data_t, bool direction){
     
     fun stat;
     
@@ -1147,7 +1225,7 @@ func_ack ili_set_display_dir(spi_packet_s *pack, bool direction){
         dir_control = 0x48;
     }
 
-    stat = ili_register_write(pack, Memory_Access_Control, dir_control, 0);
+    stat = ili_register_write(pack, data_t, Memory_Access_Control, dir_control, 0);
 
     // Should return register_written, 9.
     return (stat == 9) ? ili_ack : func_error;
@@ -1155,11 +1233,15 @@ func_ack ili_set_display_dir(spi_packet_s *pack, bool direction){
 }
 
 
-func_ack ili_set_window(ili9488_window_var_s *window, spi_packet_s *pack, spi_part_s *parts){
+func_ack ili_set_window(ili9488_window_var_s *window, fun data_t, spi_packet_s *pack, spi_part_s *parts){
+
+  printf("ILI Setting Window.\n\n");
 
     fun stat;
     fun e_stat;
     fud col_s, col_e, row_s, row_e;
+    fud d_out_one;
+    fud d_out_two;
 
     col_s = window->dw_X;
     col_e = (window->dw_Width + (window->dw_X - 1));
@@ -1172,16 +1254,25 @@ func_ack ili_set_window(ili9488_window_var_s *window, spi_packet_s *pack, spi_pa
     parts->Data_Two = get_8b_to_16b(col_e);
     parts->Data_Three = get_0b_to_8b(col_e);
 
-    stat += spi_lpa_data_write(pack, Column_Address_Set, parts->Data_Zero, parts->Data_One, parts->Data_Two, parts->Data_Three, 0);
-    stat += spi_spa_data_write(pack, NOP, 0, 0);
+    d_out_one = (parts->Data_Zero & parts->Data_One);
+    d_out_two = (parts->Data_Two & parts->Data_Three);
+
+    stat += spi_lpa_data_write(pack, data_t, Column_Address_Set, d_out_one, d_out_two, 0);
+    stat += spi_spa_data_write(pack, data_t, NOP, 0, 0);
+
+    d_out_one = 0;
+    d_out_two = 0;
 
     parts->Data_Zero = get_8b_to_16b(row_s);
     parts->Data_One = get_0b_to_8b(row_s);
     parts->Data_Two = get_8b_to_16b(row_e);
     parts->Data_Three = get_0b_to_8b(row_e);
 
-    stat += spi_lpa_data_write(pack, Page_Address_Set, parts->Data_Zero, parts->Data_One, parts->Data_Two, parts->Data_Three, 0);
-    stat += spi_spa_data_write(pack, NOP, 0, 0);
+    d_out_one = (parts->Data_Zero & parts->Data_One);
+    d_out_two = (parts->Data_Two & parts->Data_Three);
+
+    stat += spi_lpa_data_write(pack, data_t, Page_Address_Set, d_out_one, d_out_two, 0);
+    stat += spi_spa_data_write(pack, data_t, NOP, 0, 0);
 
     e_stat = (stat > 0) ? spi_ack : func_error;
 
@@ -1189,9 +1280,9 @@ func_ack ili_set_window(ili9488_window_var_s *window, spi_packet_s *pack, spi_pa
 }
 
 
-func_ack ili_set_foreground_color(ili9488_window_var_s *window, spi_packet_s *pack, uint32_t color_i){
+func_ack ili_set_foreground_color(ili9488_window_var_s *window, fun data_t, spi_packet_s *pack, uint32_t color_i){
 
-  printf("Setting ILI Foreground Color.\n");
+  printf("Setting ILI Foreground Color.\n\n");
     sleep_ms(500);
 
     int j;
@@ -1213,11 +1304,11 @@ func_ack ili_set_foreground_color(ili9488_window_var_s *window, spi_packet_s *pa
   j = 0;
   pixels_written = 0;
 
-  stat += ili_write_ram_prep(pack, Memory_Write, 0);
+  stat += ili_write_ram_prep(pack, data_t, Memory_Access_Control, 0);
     if(stat == 3){
  for(int k = 0; k < biggles; k++){
 
-  pixels_written += ili_write_ram(pack, Memory_Access_Control, pixel_cache[k]);
+  pixels_written += ili_write_ram(pack, data_t, Memory_Write, pixel_cache[k]);
   printf("\n\nWriting Pixel Cache: %i.\n", pixel_cache[k]);
 
   }
@@ -1228,7 +1319,7 @@ func_ack ili_set_foreground_color(ili9488_window_var_s *window, spi_packet_s *pa
 }
 
 
-func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, spi_packet_s *pack){
+func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, fun data_t, spi_packet_s *pack){
 	/* Set Horizontal Address Start Position */
 
     fun stat;
@@ -1239,16 +1330,16 @@ func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, spi_packet_s *pac
 	parts->Data_One = get_0b_to_8b(x);
 	parts->Data_Two = get_8b_to_16b(x);
 	parts->Data_Three = get_0b_to_8b(x);
-  stat += ili_register_write(pack, Column_Address_Set, (parts->Data_Zero & parts->Data_One), 0);
-	stat += ili_register_write(pack, NOP, 0, 0);
+  stat += ili_register_write(pack, data_t, Column_Address_Set, (parts->Data_Zero & parts->Data_One), 0);
+	stat += ili_register_write(pack, data_t, NOP, 0, 0);
 
 	/* Set Horizontal Address End Position */
 	parts->Data_Zero = get_8b_to_16b(y);
 	parts->Data_One = get_0b_to_8b(y);
 	parts->Data_Two = get_8b_to_16b(y);
 	parts->Data_Three = get_0b_to_8b(y);
-	stat += ili_register_write(pack, Page_Address_Set, (parts->Data_Zero & parts->Data_One), 0);
-	stat += ili_register_write(pack, NOP, 0, 0);
+	stat += ili_register_write(pack, data_t, Page_Address_Set, (parts->Data_Zero & parts->Data_One), 0);
+	stat += ili_register_write(pack, data_t, NOP, 0, 0);
 
     e_stat = (stat > 0) ? ili_ack : func_error;
 
@@ -1256,7 +1347,7 @@ func_ack ili_set_cursor_pos(cord x, cord y, spi_part_s *parts, spi_packet_s *pac
 }
 
 
-func_ack ili_fill(uint32_t color, spi_packet_s *pack){
+func_ack ili_fill(uint32_t color, fun data_t, spi_packet_s *pack){
 
     fun stat;
     fun f_stat;
@@ -1270,45 +1361,50 @@ func_ack ili_fill(uint32_t color, spi_packet_s *pack){
     data_break(&my_parts, (color & 0x0000FFFF));
     data_break(&my_parts, (color & 0xFFFF0000));
 
-    stat += ili_set_cursor_pos(0, 0, &my_parts, pack);
+    stat += spi_spa_command_write(&data_packet, data_t, Sleep_OUT, 0, 0);
+
+    stat += ili_set_cursor_pos(0, 0, &my_parts, data_t, pack);
     f_stat += stat;
-    stat += ili_write_ram_prep(pack, Memory_Write, 0);
+    stat += ili_write_ram_prep(pack, data_t, Memory_Write, 0);
     f_stat += stat;
 
-    for(dw = (ILI_LCD_WIDTH * ILI_LCD_HEIGHT); dw > 0; dw--){
+    for(dw = max_iterations; dw > 0; dw--){
       for(int i = 0; i < 4; i++){
 
         if(i == 0){
 
-          stat += ili_write_ram(pack, Memory_Write_Continue, my_parts.Data_Zero);
+          stat += ili_write_ram(pack, data_t, Memory_Write_Continue, my_parts.Data_Zero);
           f_stat += stat;
 
         }else if(i == 1){
 
-          stat += ili_write_ram(pack, Memory_Write_Continue, my_parts.Data_One);
+          stat += ili_write_ram(pack, data_t, Memory_Write_Continue, my_parts.Data_One);
           f_stat += stat;
 
         }else if(i == 2){
 
-          stat += ili_write_ram(pack, Memory_Write_Continue, my_parts.Data_Two);
+          stat += ili_write_ram(pack, data_t, Memory_Write_Continue, my_parts.Data_Two);
           f_stat += stat;
         }else if(i == 3){
 
-          stat += ili_write_ram(pack, Memory_Write_Continue, my_parts.Data_Three);
+          stat += ili_write_ram(pack, data_t, Memory_Write_Continue, my_parts.Data_Three);
           f_stat += stat;
 
         }
       }
     
       current_iteration++;
-      printf("\n\nCurrent Iteration: %i.\n\n", current_iteration);
+      printf("\n\nCurrent Iteration: %i.\n\tOut Of: %i\n\n", current_iteration, max_iterations);
     }
+
+    stat += spi_spa_command_write(&data_packet, data_t, Sleep_IN, 0, 0);
+    f_stat += stat;
 
     return (f_stat > 0) ? ili_ack : func_error;
 }
 
 
-func_ack ili_draw_pixel(uint32_t x, uint32_t y, spi_part_s *parts, spi_packet_s *pack){
+func_ack ili_draw_pixel(uint32_t x, uint32_t y, spi_part_s *parts, fun data_t, spi_packet_s *pack){
 
     fun stat;
     fun f_stat;
@@ -1321,24 +1417,29 @@ func_ack ili_draw_pixel(uint32_t x, uint32_t y, spi_part_s *parts, spi_packet_s 
         return 1;
     }
 
-  stat = ili_set_cursor_pos(x, y, parts, pack);
+     stat += spi_spa_command_write(&data_packet, data_t, Sleep_OUT, 0, 0);
+
+  stat = ili_set_cursor_pos(x, y, parts, data_t, pack);
   f_stat += stat;
-  stat = ili_write_ram_prep(pack, Memory_Write, 0);
+  stat = ili_write_ram_prep(pack, data_t, Memory_Write, 0);
   f_stat += stat;
 
     while(pixel_cache[i] != '\n'){
 
-    stat = ili_write_ram(pack, Memory_Write, pixel_cache[i++]);
+    stat = ili_write_ram(pack, data_t, Memory_Write, pixel_cache[i++]);
     f_stat += stat;
 
     }
+
+  stat += spi_spa_command_write(&data_packet, data_t, Sleep_OUT, 0, 0);
+  f_stat += stat;
 
     return (f_stat > 0) ? ili_ack : func_error;
 
 }
 
 
-func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_part_s *parts, spi_packet_s *pack){
+func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_part_s *parts, fun data_t, spi_packet_s *pack){
 
     fun stat;
     fun drawn_stat;
@@ -1359,7 +1460,7 @@ func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_p
     d_x = abs(x2 - x1);
     d_y = abs(y2 - y1);
 
-  stat = ili_draw_pixel(x, y, parts, pack);
+  stat = ili_draw_pixel(x, y, parts, data_t, pack);
   drawn_stat += stat;
 
     if(d_x > d_y){
@@ -1377,7 +1478,7 @@ func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_p
 
             }
 
-    stat = ili_draw_pixel(x, y, parts, pack);
+    stat = ili_draw_pixel(x, y, parts, data_t, pack);
     drawn_stat += stat;
 
         }
@@ -1397,7 +1498,7 @@ func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_p
 
             }
 
-  stat = ili_draw_pixel(x, y, parts, pack);
+  stat = ili_draw_pixel(x, y, parts, data_t, pack);
   drawn_stat += stat;
         }
     }
@@ -1406,7 +1507,7 @@ func_ack ili_draw_line(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, spi_p
 }
 
 
-func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s *window, spi_part_s *parts, spi_pins *pins, spi_packet_s *pack){
+func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s *window, spi_part_s *parts, fun data_t, spi_pins *pins, spi_packet_s *pack){
 
     fun stat;
     fun f_stat;
@@ -1416,13 +1517,15 @@ func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s
     window->dw_Width = width;
     window->dw_Height = height;
 
-    stat = ili_set_window(window, pack, parts);
+    stat = ili_set_window(window, data_t, pack, parts);
     f_stat += stat;
 
-    stat = ili_set_cursor_pos(x, y, parts, pack);
+    stat = ili_set_cursor_pos(x, y, parts, data_t, pack);
     f_stat += stat;
 
-    stat = ili_write_ram_prep(pack, Memory_Write, 0);
+    stat = ili_write_ram_prep(pack, data_t, Memory_Write, 0);
+    f_stat += stat;
+    stat = ili_write_ram_prep(pack, data_t, NOP, 0);
     f_stat += stat;
 
     return (f_stat > 0) ? ili_ack : func_error;
@@ -1430,7 +1533,7 @@ func_ack ili_draw_prep(fud x, fud y, fud width, fud height, ili9488_window_var_s
 }
 
 
-func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts, spi_packet_s *pack){
+func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts, fun data_t, spi_packet_s *pack){
 
     fun stat;
     fun f_stat;
@@ -1450,14 +1553,14 @@ func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts,
         for(row = 0; row < 8; row++){
             if((charset10x14[o_set1] >> (7 - row)) & 0x01){
                 
-              stat = ili_draw_pixel((x + col), (y + row + 8), parts, pack);
+              stat = ili_draw_pixel((x + col), (y + row + 8), parts, data_t, pack);
               f_stat += stat;
             }
 
         for (row = 0; row < 6; row++){
             if((charset10x14[o_set2] >> (7 - row) & 0x01)){
                 
-              stat = ili_draw_pixel((x + col), (y + row + 8), parts, pack);
+              stat = ili_draw_pixel((x + col), (y + row + 8), parts, data_t, pack);
               f_stat += stat;
         }
       }
@@ -1467,7 +1570,7 @@ func_ack ili_draw_char(uint32_t x, uint32_t y, fun character, spi_part_s *parts,
 }
 
 
-func_ack ili_draw_string(uint32_t x, uint32_t y, fun *string_ptr, spi_part_s *parts, spi_packet_s *pack){
+func_ack ili_draw_string(uint32_t x, uint32_t y, fun *string_ptr, spi_part_s *parts, fun data_t, spi_packet_s *pack){
 
     fun stat;
     fud f_stat;
@@ -1487,7 +1590,7 @@ func_ack ili_draw_string(uint32_t x, uint32_t y, fun *string_ptr, spi_part_s *pa
 
         }else {
 
-          stat = ili_draw_char(x, y, *input[i], parts, pack);
+          stat = ili_draw_char(x, y, *input[i], parts, data_t, pack);
             x += my_font.f_width + 2;
             f_stat += stat;
         }
@@ -1533,56 +1636,64 @@ func_ack ili_initialize(ili_init_var_s *init){
     fun *p_ptr;
 
     printf("Send: Soft Reset.\n");
-    stat += spi_spa_command_write((init->data_packet), SOFT_RESET, 0, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S ,SOFT_RESET, 0, 0);
     ili_delay(200);
 
     printf("Send: Sleep Out.\n");
-    stat += spi_spa_command_write((init->data_packet), Sleep_OUT, 0, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S, Sleep_OUT, 0, 0);
     ili_delay(200);
 
    // *p_ptr = 0x48;
     printf("Send: Memory Access Control.\n");
-    stat += spi_spa_command_write((init->data_packet), Memory_Access_Control, 0x48, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSW_OS, Memory_Access_Control, 0x48, 0);
    // stat += managed_command_spi(*(&init->data_packet), *(&init->my_parts),Memory_Access_Control, (p_ptr), 0);
     ili_delay(200);
 
     // *p_ptr = 0x04;
     printf("Send: CABC Control Nine.\n");
-    stat += spi_spa_command_write((init->data_packet), CABC_Control_Nine, 0x04, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSW_OS, CABC_Control_Nine, 0x04, 0);
     // stat += managed_command_spi(*(&init->data_packet), *(&init->my_parts), CABC_Control_Nine, p_ptr, 0);
     ili_delay(200);
 
     // *p_ptr = 0x05;
     printf("Send: Interface Pixel Format.\n");
-    stat += spi_spa_command_write((init->data_packet), Interface_Pixel_Format, 0x05, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSW_OS, Interface_Pixel_Format, 0x05, 0);
     // stat += managed_command_spi(*(&init->data_packet), *(&init->my_parts), Interface_Pixel_Format, p_ptr, 0);
     ili_delay(200);
 
     printf("Send: Normal Display Mode On.\n");
-    stat += spi_spa_command_write((init->data_packet), Normal_Display_Mode_ON, 0, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S, Normal_Display_Mode_ON, 0, 0);
     // stat += managed_command_spi(*(&init->data_packet), *(&init->my_parts), Normal_Display_Mode_ON, 0, 0);
     ili_delay(200);
 
     printf("Send: Display On.\n");
-    stat += spi_spa_command_write((init->data_packet), Display_ON, 0, 0);
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S, Display_ON, 0, 0);
     // stat += managed_command_spi(*(&init->data_packet), *(&init->my_parts), Display_ON, 0, 0);
     ili_delay(200);
 
     printf("Set: Display Dir>>Normal.\n");
-    stat += ili_set_display_dir(*(&init->data_packet), true);
+    stat += ili_set_display_dir(*(&init->data_packet), SPa_DCSWN_S, true);
     ili_delay(200);
 
     printf("Set: Foreground Color:DarkGreen?\n");
-    stat += ili_set_foreground_color(*(&init->my_window), *(&init->data_packet), (init->my_op->ili_foreground_color));
+    stat += ili_set_foreground_color(*(&init->my_window), SPa_DCSWN_S, *(&init->data_packet), (init->my_op->ili_foreground_color));
+    ili_delay(200);
+
+    printf("Fill ILI Screen.\n");
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S, All_Pixel_ON, 0, 0);
     ili_delay(200);
     
-
     printf("Set: Cursor Position.\n");
-    stat += ili_set_cursor_pos(0, 0, *(&init->my_parts), *(&init->data_packet));
+    stat += ili_set_cursor_pos(0, 0, *(&init->my_parts), SPa_DCSWN_S, *(&init->data_packet));
     ili_delay(200);
-  printf("Current Status Returns: %i.\n\n", stat);
-  
-    e_stat = (stat == 26) ? ili_initialized : func_error;
+
+
+      printf("Sleep IN.\n");
+    stat += spi_spa_command_write((init->data_packet), SPa_DCSWN_S, Sleep_IN, 0, 0);
+    ili_delay(200);
+    printf("Current Status Returns: %i.\n\n", stat);
+
+    e_stat = (stat == 39) ? ili_initialized : func_error;
     printf("Exiting with status: %i.\n", e_stat);
 
     return e_stat;
@@ -1601,14 +1712,14 @@ func_ack spi_managed_command_write(spi_packet_s *packet, spi_part_s *part, fun c
   fun f_stat;
   fun stat;
 
-  bytes = spi_write_read_blocking(packet->instance, &command, 0, 0);
+  bytes = spi_write_blocking(packet->instance, &command, 0, 0);
   printf("Current number of bytes: %i.\n", bytes);
 
   f_stat = 0x00;
 
   if(param != 0){
 
-  packet->spi_func_status += spi_write_read_blocking(packet->instance, param, 0, 0);
+  packet->spi_func_status += spi_write_blocking(packet->instance, param, 0, 0);
   f_stat += packet->spi_func_status;
 
   }
@@ -1618,31 +1729,31 @@ func_ack spi_managed_command_write(spi_packet_s *packet, spi_part_s *part, fun c
 
       if(i == 0){
 
-        packet->spi_func_status += spi_write_read_blocking(packet->instance, &part->Data_Zero, 0, 0);
+        packet->spi_func_status += spi_write_blocking(packet->instance, &part->Data_Zero, 0, 0);
         f_stat += packet->spi_func_status;
 
       }
       if(i == 1){
 
-        packet->spi_func_status += spi_write_read_blocking(packet->instance, &part->Data_One, 0, 0);
+        packet->spi_func_status += spi_write_blocking(packet->instance, &part->Data_One, 0, 0);
         f_stat += packet->spi_func_status;
 
       }
       if(i == 2){
 
-        packet->spi_func_status += spi_write_read_blocking(packet->instance, &part->Data_Two, 0, 0);
+        packet->spi_func_status += spi_write_blocking(packet->instance, &part->Data_Two, 0, 0);
         f_stat += packet->spi_func_status;
 
       }
       if(i == 3){
 
-        packet->spi_func_status += spi_write_read_blocking(packet->instance, &part->Data_Three, 0, 0);
+        packet->spi_func_status += spi_write_blocking(packet->instance, &part->Data_Three, 0, 0);
         f_stat += packet->spi_func_status;
 
       }
       if(i == 4){
 
-        packet->spi_func_status += spi_write_read_blocking(packet->instance, &part->Data_Four, 0, 0);
+        packet->spi_func_status += spi_write_blocking(packet->instance, &part->Data_Four, 0, 0);
         f_stat += packet->spi_func_status;
 
       }
@@ -1652,7 +1763,7 @@ func_ack spi_managed_command_write(spi_packet_s *packet, spi_part_s *part, fun c
 
   } 
 
-  packet->spi_func_status += spi_write_read_blocking(packet->instance, part->Ecc, 0, 0);
+  packet->spi_func_status += spi_write_blocking(packet->instance, part->Ecc, 0, 0);
   f_stat += packet->spi_func_status;
 
 
@@ -1731,7 +1842,7 @@ func_ack spi_managed_data_write(spi_pins *pins, spi_packet_s *pack, spi_part_s *
 
   if(lp_a == false){
 
-    spi_write_read_blocking(pack->instance, com_ptr, 0, 0);
+    spi_write_blocking(pack->instance, com_ptr, 0, 0);
     for(i = 0; i < 0xFF; i++);
 
     csn_put_high(pins->csn);
@@ -1743,7 +1854,7 @@ func_ack spi_managed_data_write(spi_pins *pins, spi_packet_s *pack, spi_part_s *
     part->data_packet = packet_buffer(pack, part, i, lp_a);
 
       ili_delay(100);
-    bytes = spi_write_read_blocking(pack->instance, &pack->tx_buf, &pack->rx_buf, pack->length);
+    bytes = spi_write_blocking(pack->instance, &pack->tx_buf, &pack->rx_buf, pack->length);
   for(i = 0; i < 0x5F; i++);
 
     }
@@ -1841,6 +1952,5 @@ spi_packet_s packet_buffer(spi_packet_s *packet, spi_part_s *part, int buf_inc, 
 }
 
 */
-
 
 #endif

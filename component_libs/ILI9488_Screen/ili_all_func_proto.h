@@ -668,14 +668,14 @@ void dcrs_put_low(fun ds) {
 }
 
 
-fun spi_length(spi_packet_s *inst, fun input){
+ebit spi_length(ebit input){
 
-  fun sized;
+  ebit sized;
   sized = 0x00;
 
 //  printf("Checking length.\n");
 
-  sized = (sizeof(input) / sizeof(txb));
+  sized = (sizeof(input) / sizeof(ebit));
 
 //  printf("Length: %i.\n", sized);
 

@@ -3,7 +3,8 @@
 //  Via a 595 shift register
 
 #include <stdio.h>
-#include "/home/alphonse/Downloads/component_libs/Periphereals/pico_pin_enum.h"
+#include "../../Periphereals/resources/pico_pin_enum.h"
+#include "../../Periphereals/shift_registers.h"
 #include "hardware/gpio.h"
 #include "2004a_error_management.h"
 #include "_2004A_commands.h"
@@ -14,13 +15,16 @@
 #define med_high_b 0x30
 #define high_b 0x20
 
-#define reg_en 0x10
-#define reg_rs 0x20
-#define reg_bl 0x80
-#define reg_RS (!reg_rs)
+#define reg_En (0x10 | 0x80)
+#define reg_EN (reg_En & !0x10)
 
-#define reg_COM (reg_en | reg_bl | reg_RS)
-#define reg_CHAR (reg_en | reg_bl | reg_rs)
+#define reg_Rs (0x20 | 0x80)
+#define reg_RS (reg_Rs & !0x20)
+
+#define reg_init 0x00
+
+#define reg_COM (reg_En | reg_RS)
+#define reg_CHAR (reg_En | reg_Rs)
 
 #define ebit uint8_t
 
@@ -36,13 +40,33 @@ typedef struct lcd_line_data
 
 // Begin by setting up pins for register use.
 register_pins my_regi = {
-    .register_one_data = GPIO_ZERO,
+    .register_one_data = GPIO_TWELVE,
     .register_one_latch = GPIO_SIXTEEN,
     .register_one_enable = GPIO_SEVENTEEN,
-    .register_two_data = GPIO_TWELVE,
+    .register_two_data = GPIO_ZERO,
     .register_two_latch = UNDEFINED,
     .register_two_enable = UNDEFINED,
-    .register_clk_line = GPIO_ONE};
+    .register_clk_line = GPIO_ONE
+    
+    };
+
+//  Function prototypes
+
+func_akk setup_my_registers(register_pins *pins);
+void clock_pulse(register_pins *clk);
+void latch_register(register_pins *latch, bool which);
+void register_nibble(register_pins *pins, ebit input_data);
+void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, ebit lcd_config);
+uint8_t char_to_uint_t(char *inputs, uint8_t *output);
+func_akk pico_com_to_lcd(register_pins *pins, ebit config, ebit command);
+func_akk pico_char_to_lcd(register_pins *pins, ebit config, ebit character);
+void pico_to_clear_lcd(register_pins *pins);
+func_akk pico_to_lcd_line(register_pins *pins, ebit *data, ebit line_pos);
+func_akk pico_lcd_initialise(register_pins *pins);
+func_akk pico_to_write_screen(register_pins *pins, char *l_one, char *l_two, char *l_three, char *l_four);
+func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three, uint8_t colors);
+
+
 
 func_akk setup_my_registers(register_pins *pins){
   ebit status;
@@ -137,68 +161,50 @@ func_akk setup_my_registers(register_pins *pins){
   return ((status == 7) ? pin_init : err);
 }
 
-//  reg_sel true is for outputting to LCD, reg_sel false is non regulated output.
-void register_nibble(bool reg_sel, register_pins *pins, ebit data)
+void clock_pulse(register_pins *clk){
+
+  gpio_put(clk->register_clk_line, 1);
+    sleep_us(20);
+  gpio_put(clk->register_clk_line, 0);
+
+}
+
+void latch_register(register_pins *latch, bool which){
+
+  if(!which){
+    gpio_put(latch->register_one_latch, 1);
+      sleep_us(20);
+    gpio_put(latch->register_one_latch, 0);
+      sleep_us(20);
+  }else {
+    gpio_put(latch->register_two_latch, 1);
+      sleep_us(20);
+    gpio_put(latch->register_two_latch, 0);
+      sleep_us(20);
+  }
+
+
+}
+
+//  reg_sel false is for outputting to LCD, reg_sel true is non regulated output.
+//  Chomar is the COM/CHAR command bitspace.
+void register_nibble(register_pins *pins, ebit input_data)
 {
 
-  ebit output;
-  output = 0;
-
-  output = ((data & 0xFF));
-
-  if (reg_sel)
-  {
-    //    Begin setting the register to send data to lcd.
-    gpio_put(pins->register_clk_line, 0);
     gpio_put(pins->register_one_enable, 1);
-    gpio_put(pins->register_one_latch, 0);
 
-    // Register should be ready for eight bits now.
-    for (int i = 0; i < 0; i++)
-    {
-      if (i <= 5)
-      {
-        data = (data & 0x10) ? (data & ~0x10) : data;
-      }
-      else
-      {
-        gpio_put(pins->register_two_data, ((output & 0xFF) >> i));
-        gpio_put(pins->register_clk_line, 1);
-        sleep_us(10);
-        gpio_put(pins->register_clk_line, 0);
-      }
-    }
-    gpio_put(pins->register_one_latch, 0);
-    gpio_put(pins->register_one_enable, 0);
-    gpio_put(pins->register_clk_line, 1);
-  }
-  else
-  {
 
-    //    Begin setting the register to send data to lcd.
-    gpio_put(pins->register_clk_line, 0);
-    gpio_put(pins->register_one_enable, 1);
-    gpio_put(pins->register_one_latch, 0);
+        for (int i = 0; i < 8; i++)
+      {
+          gpio_put(pins->register_one_data, (((input_data >> i) & 0x01) ? 1 : 0) );
+            clock_pulse(pins);
+          sleep_us(50);
+      }
+        latch_register(pins, false);
+        clock_pulse(pins);
+        gpio_put(pins->register_one_enable, 0);
 
-    // Register should be ready for eight bits now.
-    for (int i = 0; i < 8; i++)
-    {
-      if (i <= 5)
-      {
-        data = (data & 0x10) ? (data & ~0x10) : data;
-      }
-      else
-      {
-        gpio_put(pins->register_one_data, ((data & 0xFF) >> i));
-        gpio_put(pins->register_clk_line, 1);
-        sleep_us(100);
-        gpio_put(pins->register_clk_line, 0);
-      }
-    }
-    gpio_put(pins->register_one_latch, 0);
-    gpio_put(pins->register_one_enable, 0);
-    gpio_put(pins->register_clk_line, 1);
-  }
+
 }
 
 void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, ebit lcd_config)
@@ -213,16 +219,18 @@ void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, ebit lcd_c
 
   if (reg_sel)
   {
-    register_nibble(true, pins, lcd_config);
+    register_nibble(pins, LSB);
+    printf("////\tReg_Byte LSB: 0x%02x.\t////\n", LSB);
+    sleep_us(10);
 
-    register_nibble(true, pins, LSB);
-    sleep_us(100);
-    register_nibble(true, pins, MSB);
+    register_nibble(pins, MSB);
+    printf("////\tReg_Byte MSB: 0x%02x.\t////\n", MSB);
+        sleep_us(10);
+
   }
   else
   {
-
-    register_nibble(false, pins, data_byte);
+    register_nibble(pins, data_byte);
   }
 }
 
@@ -238,7 +246,7 @@ uint8_t char_to_uint_t(char *inputs, uint8_t *output)
   }
 }
 
-//  Example of {{ register_byte(true, &my_regi, 0x65, (!reg_rs | reg_en | reg_bl)); }}
+//  Example of {{ register_byte(&my_regi, 0x01, 0xA0}
 func_akk pico_com_to_lcd(register_pins *pins, ebit config, ebit command)
 {
 
@@ -261,12 +269,18 @@ func_akk pico_set_lcd_cursor(register_pins *pins, ebit line, ebit position)
 
   printf("\n//SETTING LCD CURSOR POSITION//\n");
   printf("//To Line: %i\n//Position: %i\n", line, position);
+  
   ebit s;
   s = 0;
+
   ebit output_position;
   output_position = 0;
-  ebit offset_lines[] = {0x00, 0x40, 0x14, 0x54};
-  output_position = 0x80 + offset_lines[line] + position;
+
+  ebit offset_lines[] = {0x00, 0x14, 0x40, 0x54};
+  output_position = 0x80 | ( offset_lines[line] + position );
+
+  // set dd_ramaddr 0x80
+
   s += pico_com_to_lcd(pins, reg_COM, output_position);
 
   return (s > 0) ? device_command_success : err;
@@ -292,7 +306,7 @@ func_akk pico_to_lcd_line(register_pins *pins, ebit *data, ebit line_pos)
   for (int i = 0; i < 20; i++)
   {
     printf("Current Data: 0x%02x.\n", data[i]);
-    pico_char_to_lcd(pins, (reg_en | reg_bl | reg_rs), data[i]);
+    pico_char_to_lcd(pins, reg_CHAR, data[i]);
     status += 1;
   }
 
@@ -307,36 +321,38 @@ func_akk pico_lcd_initialise(register_pins *pins){
 
   printf("\n//LCD INITIALISE//\n");
 
-  pico_com_to_lcd(pins, reg_COM, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
-    sleep_ms(20);
-  pico_com_to_lcd(pins, reg_COM, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
-    sleep_ms(20);
-  pico_com_to_lcd(pins, reg_COM, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
-    sleep_ms(20);
-  pico_com_to_lcd(pins, reg_COM, 0x02);
+    pico_com_to_lcd(pins, reg_init, 0x02);
     status += 1;
     printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x02));
     sleep_ms(100);
-  pico_com_to_lcd(pins, reg_COM, (LCD_FUNCTIONSET | LCD_2LINE));
+
+  pico_com_to_lcd(pins, reg_init, 0x03);
+    status += 1;
+    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
+    sleep_ms(20);
+  pico_com_to_lcd(pins, reg_init, 0x03);
+    status += 1;
+    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
+    sleep_ms(20);
+  pico_com_to_lcd(pins, reg_init, 0x03);
+    status += 1;
+    printf("Initialisation Command: 0x%02x.\n", (reg_COM | 0x03));
+    sleep_ms(20);
+
+  pico_com_to_lcd(pins, reg_init, (LCD_FUNCTIONSET | LCD_2LINE));
     status += 1;
     printf("Initialisation Command: 0x%02x.\n", (reg_COM | (LCD_FUNCTIONSET | LCD_2LINE)));
     sleep_ms(20);
-  pico_com_to_lcd(pins, reg_COM, (LCD_DISPLAYCONTROL | LCD_DISPLAYON));
+  pico_com_to_lcd(pins, reg_init, (LCD_DISPLAYCONTROL | LCD_DISPLAYON));
     status += 1;
     printf("Initialisation Command: 0x%02x.\n", (reg_COM | (LCD_DISPLAYCONTROL | LCD_DISPLAYON)));
   sleep_ms(20);
-  pico_com_to_lcd(pins, reg_COM, (LCD_ENTRYMODESET | LCD_ENTRYLEFT));
+  pico_com_to_lcd(pins, reg_init, (LCD_ENTRYMODESET | LCD_ENTRYLEFT));
     status += 1;
     printf("Initialisation Command: 0x%02x.\n", (reg_COM | (LCD_ENTRYMODESET | LCD_ENTRYLEFT)));
   sleep_ms(20);
 
-  return (status == 7) ? device_command_success : err;
+  return (status == 8) ? device_command_success : err;
 }
 
 //  Write data to the full screen, by lines.
@@ -380,25 +396,24 @@ func_akk pico_to_write_screen(register_pins *pins, char *l_one, char *l_two, cha
 
 func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three, uint8_t colors)
 {
-  uint8_t status, f_status;
+  uint8_t status;
   status = 0;
-  f_status = 0;
 
   sprintf(line->line_one, "RC Controller: Active");
   status += 1;
-  sprintf(line->line_two, "Vert: %04x|Hor: %04x", in_one, in_two);
+  sprintf(line->line_two, "Ver: %04x| Hor: %04x", in_one, in_two);
   status += 1;
   sprintf(line->line_three, "VRoom Amount: %04x", in_three);
   status += 1;
   sprintf(line->line_four, "Head: %02xRear: %02x", (colors & 0xF0), (colors & 0x0F));
   status += 1;
   printf("Status: %i.\n", status);
-  f_status = (status == 4) ? device_data_success : err;
+
 
   status += pico_to_write_screen(pins, line->line_one, line->line_two, line->line_three, line->line_four);
   printf("Status: %i.\n", status);
-  f_status = (status == 8) ? device_data_success : err;
-  return f_status;
+  
+  return (status == 8) ? device_data_success : err;
 }
 
 #endif

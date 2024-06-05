@@ -1,5 +1,0 @@
-#ifndef BEER_LISTS_TRANSFERS_H
-#define BEER_LISTS_TRANSFERS_H
-
-
-#endif

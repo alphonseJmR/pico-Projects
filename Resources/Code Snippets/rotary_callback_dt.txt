@@ -1,0 +1,30 @@
+
+    if (timeSinceLastInterrupt > 1500) {
+        rotary.lastInterruptTime = currentTime;
+        gpio_acknowledge_irq(gpio, events);
+
+        rotary.clk_status = gpio_get(rotary_clk);
+        rotary.dt_status = gpio_get(rotary_dt);
+
+  //    Check if current dt status != last dt status.
+    if(rotary.dt_status != rotary.last_dt_status){
+
+  //    Check if -dt = 1 && clk = 0- || -dt = 0 && clk = 1-
+    if((rotary.dt_status && !rotary.clk_status) || (!rotary.dt_status && rotary.clk_status)){
+        
+      if(rotary.rotary_total_value >= 100){
+
+        rotary.rotary_total_value -= 5;
+
+          if(rotary.rotary_total_value < 100){
+
+            rotary.rotary_total_value = 110;
+            printf("At minimum value.\n\n");
+                    }
+                }
+            }
+        }
+    }
+        rotary.last_clk_status = rotary.clk_status;
+        rotary.last_dt_status = rotary.dt_status;
+    }

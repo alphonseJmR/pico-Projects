@@ -20,12 +20,6 @@
 #define lcd_rs 8
 #define lcd_e 9
 
-#define lcd_A 10
-#define lcd_B 7
-#define lcd_C 19
-#define lcd_D 20
-
-
 typedef struct lcd_line_data
 {
 
@@ -35,18 +29,7 @@ typedef struct lcd_line_data
   char line_four[20];
 
 } lcd_lines;
-
-// Begin by setting up pins for register use.
-register_pins my_regi = {
-    .register_one_data = GPIO_TWELVE,
-    .register_one_latch = GPIO_SIXTEEN,
-    .register_one_enable = GPIO_SEVENTEEN,
-    .register_two_data = GPIO_ZERO,
-    .register_two_latch = UNDEFINED,
-    .register_two_enable = UNDEFINED,
-    .register_clk_line = GPIO_ONE
-    
-    };
+lcd_lines my_lcd_lines;
 
 //  Function prototypes
 
@@ -207,20 +190,12 @@ void latch_register(register_pins *latch, bool which){
 }
 
 
-//  reg_sel false is for outputting to LCD, reg_sel true is non regulated output.
-//  Chomar is the COM/CHAR command bitspace.
+
 void register_nibble(register_pins *pins, ebit input_data)
 {
 
-  // ebit test_flipp;
-  // test_flipp = 0x00;
-
     gpio_put(pins->register_one_enable, 1);
-    input_data = (input_data | 0x30);
-  //  print_binary(input_data);
 
-    // test_flipp += uint_flip(input_data);
-    // print_binary(test_flipp);
         for (int i = 0; i < 8; i++)
       {
           gpio_put(pins->register_one_data, (((input_data >> i) & 0x01) ? 1 : 0) );
@@ -253,19 +228,18 @@ void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, bool Choma
       sleep_us(5);
     gpio_put(lcd_e, 1);
       sleep_us(5);
-    register_nibble(pins, LSB);
+    register_nibble(pins, (MSB & 0x0F));
       sleep_us(5);
     gpio_put(lcd_e, 0);
       sleep_us(10);
     //  Send MSB of input data.  Format follows from LSB.
     gpio_put(lcd_e, 1);
       sleep_us(5);
-    register_nibble(pins, MSB);
+    register_nibble(pins, (LSB & 0x0F));
       sleep_us(5);
     gpio_put(lcd_e, 0);
        sleep_us(5);
-    gpio_put(lcd_rs, 1);
-      sleep_us(10);
+
 
   }else {
 
@@ -275,7 +249,7 @@ void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, bool Choma
       sleep_us(5);
     gpio_put(lcd_e, 1);
       sleep_us(5);
-    register_nibble(pins, LSB);
+    register_nibble(pins, (LSB & 0x0F));
       sleep_us(5);
     gpio_put(lcd_e, 0);
       sleep_us(10);
@@ -284,12 +258,11 @@ void register_byte(bool reg_sel, register_pins *pins, ebit data_byte, bool Choma
     sleep_us(5);
     gpio_put(lcd_e, 1);
       sleep_us(5);
-    register_nibble(pins, MSB);
+    register_nibble(pins, (MSB & 0x0F));
       sleep_us(5);
     gpio_put(lcd_e, 0);
        sleep_us(5);
-    gpio_put(lcd_rs, 0);
-      sleep_us(10);
+
 
   }
   }
@@ -431,31 +404,13 @@ func_akk pico_lcd_initialise(register_pins *pins){
   printf("\n//LCD INITIALISE//\n");
 
 
-
-  register_nibble(pins, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (0x03));
-    sleep_ms(20);
-  register_nibble(pins, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (0x03));
-    sleep_ms(20);
-  register_nibble(pins, 0x03);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (0x03));
-    sleep_ms(20);
-  register_nibble(pins, 0x02);
-    status += 1;
-    printf("Initialisation Command: 0x%02x.\n", (0x02));
-    sleep_ms(100);
-
   pico_com_to_lcd(pins, (LCD_FUNCTIONSET | LCD_2LINE));
     status += 1;
     printf("Initialisation Command: 0x%02x.\n", ((LCD_FUNCTIONSET | LCD_2LINE)));
     sleep_ms(20);
   pico_com_to_lcd(pins, (LCD_DISPLAYCONTROL | LCD_DISPLAYON));
     status += 1;
-    printf("Initialisation Command: 0x%02x.\n", ((LCD_DISPLAYCONTROL | LCD_DISPLAYON)));
+    printf("Initialisation Command: 0x%02x.\n", ((LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSORON)));
 
   pico_to_clear_lcd(pins);
   sleep_ms(20);

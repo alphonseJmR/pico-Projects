@@ -129,7 +129,7 @@ void lcd_byte(lcd_pins *pins, uint8_t byte_input){
     if(byte_input >= 0x00 && byte_input <= 0xFF){
 
     lsb = (byte_input & 0x0F);
-    msb = ((byte_input & 0xF0) >> 4);
+    msb = ((byte_input >> 4) & 0x0F);
     
     }else {
         printf("\nLCD Input Byte Out of Range.\n\n");
@@ -151,7 +151,7 @@ void lcd_byte(lcd_pins *pins, uint8_t byte_input){
     lcd_nibble(pins, (lsb & 0x0F));
     printf("lsb: 0x%02x.\n", lsb);
         sleep_us(10);
-        e_low(pins);
+    e_low(pins);
         sleep_us(10);
 
 }
@@ -247,16 +247,6 @@ void lcd_init_sequence(lcd_pins *pins){
 
     printf("\n////\tInitialiasing 2004A LCD Screen\t////\n");
 
-/*
-    lcd_byte(pins, 0x03);
-        sleep_ms(20);
-    lcd_byte(pins, 0x03);
-        sleep_ms(20);
-    lcd_byte(pins, 0x03);
-        sleep_ms(20);
-    lcd_byte(pins, 0x02);
-*/
-
         sleep_ms(20);
     lcd_command(pins, (0x02 | 0x80));
       printf("Command Hex: 0x28\n");
@@ -285,36 +275,5 @@ void lcd_fill_screen(lcd_pins *pins, uint8_t spec_char){
     }
 
 }
-
-
-/*
-void test_screen_write(lcd_pins *pins, uint8_t ms_nib, uint8_t ls_nib){
-
-    printf("\n////\tTest Screen Char Write\t////\n");
-
-printf("Setting Command: 0x10\n");
-    rs_com(pins);
-      sleep_us(500);
-        e_high(pins);
-          sleep_us(500);
-            lcd_nibble(pins, (0x80 & 0xF0) >> 4);
-                  sleep_ms(2000);
-            lcd_nibble(pins, 0x04);
-              sleep_us(500);
-                e_low(pins);
-                  sleep_ms(2000);
-//  test replacing with lcd_command?
-    lcd_command(pins, 0x01);
-        sleep_us(500);
-
-    lcd_character(pins, (ms_nib | ls_nib));
-
-        sleep_ms(4000);
-
-}
-
-*/
-
-
 
 #endif

@@ -5,6 +5,8 @@
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 
+
+
 #define ebit uint8_t
 uint8_t char_val;
 
@@ -13,23 +15,33 @@ uint16_t rot_buf;
 int rgb_cycle;
 ebit initialise_sequence;
 
-lcd_lines my_lines = {
-  .line_one = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', },
-  .line_two = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', },
-  .line_three = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', },
-  .line_four = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', }
+/*
+lcd_pins my_lpins = {
+
+  .RS = 8,
+  .Enable = 9,
+  .A = 11,
+  .B = 12,
+  .C = 19,
+  .D = 20
 
 };
+*/
 
-register_pins reg_pins = {
+register_pins my_regi = {
 
-  .register_one_data = GPIO_TWELVE,
-  .register_one_latch = GPIO_SEVENTEEN,
-  .register_one_enable = GPIO_SIXTEEN,
-  .register_two_data = GPIO_ZERO,
-  .register_clk_line = GPIO_ONE
+    .register_one_data = GPIO_TWELVE,
+    .register_one_latch = GPIO_SIXTEEN,
+    .register_one_enable = GPIO_SEVENTEEN,
 
-};
+    .register_two_data = GPIO_ZERO,
+    .register_two_latch = UNDEFINED,
+    .register_two_enable = UNDEFINED,
+
+    .register_clk_line = GPIO_ONE
+    
+  };
+
 
 button_types enabled_buttons = {
 
@@ -146,6 +158,34 @@ nrf_manager_t my_config = {
     .retr_delay = ARD_500US 
   };
 
+
+void test_line(void){
+
+  pico_to_clear_lcd(&my_regi);
+    sleep_us(10);
+  pico_set_lcd_cursor(&my_regi, 0, 0);
+    sleep_us(10);
+  
+  for(int i = 0; i < 20; i++){
+
+    pico_char_to_lcd(&my_regi, 0x73);
+      sleep_us(5);
+
+  }
+  
+    sleep_us(10);
+  pico_set_lcd_cursor(&my_regi, 2, 0);
+    sleep_us(10);
+  
+  for(int j = 0; j < 20; j++){
+
+    pico_char_to_lcd(&my_regi, 0x65);
+      sleep_us(5);
+
+  }
+
+
+}
 int main() {
   initialise_sequence = 0;
   function_status_checker = 0x00;
@@ -167,10 +207,14 @@ int main() {
       button_interrupt_init(&enabled_buttons);
 
 //  Initialize pin setup for cd74hc595e(s).
-    initialise_sequence += setup_my_registers(&my_regi);
+      setup_my_registers(&my_regi);
+        sleep_ms(200);
+  //  init_lcd_pins(&my_lpins);
 
 //  Initialize LCD for control interface.
-     initialise_sequence += pico_lcd_initialise(&my_regi);
+  pico_lcd_initialise(&my_regi);
+    sleep_ms(200);
+  //  lcd_init_sequence(&my_lpins);
 
 
   // SPI baudrate
@@ -202,6 +246,9 @@ int main() {
 
   (initialise_sequence == 4) ? printf("\n\n//START PROGRAM//\n\n") : printf("\n\n//ABORT PROGRAM//\n\tSequence BEQ:\n\n", initialise_sequence);
   
+  uint8_t rand;
+  rand = 0;
+
 while(1) {
 
   printf("\n");
@@ -210,15 +257,14 @@ while(1) {
   rot_buf = rotary.rotary_total;
   sleep_ms(500);
 
-  pico_to_default_screen(&my_regi, &my_lines, my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, rot_buf, 0x36);
-  //  Begin Transmitting RF data.
+ pico_to_default_screen(&my_regi, &my_lcd_lines, my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, rot_buf, 0x36);
+      sleep_ms(4000);
 
-  printf("\n\n\n\t\t////////\t\t////////\n\n\n\n");
-  printf("\t\t\t\tFilling Screen with %i.\n", char_val);
-  sleep_ms(2000);
-    function_status_checker = pico_to_fill_screen_with_char(&my_regi, char_val);
-  printf("\nShould be finished.\n");
-  sleep_ms(2000);
+//  lcd_default_display(&my_lpins,  my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, rot_buf, 0x36);
+
+
+//  Begin Transmitting RF data.
+
 /*
   for(int zv = 0; zv < 1; zv++)
   {
@@ -312,7 +358,7 @@ while(1) {
 
 */
   sleep_ms(500);
-    printf("Next Iteration?\n");
+    printf("\n\nNext Iteration?\n");
     
 }
 tight_loop_contents();

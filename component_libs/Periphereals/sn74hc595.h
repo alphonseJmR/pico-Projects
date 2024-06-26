@@ -6,7 +6,7 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "resources/pico_pin_enum.h"
-#include "resources/Rc_RGB_Combinations.h"
+
 
 typedef struct register_595_pin_s {
 
@@ -21,22 +21,6 @@ typedef struct register_595_pin_s {
     const uint8_t REGISTERS_CLK_LINE;
 
 } registered_pins;
-
-//  This array is pairs of Data & delay_test values to validate against the function
-const uint8_t testing_values[20] = {
-
-JRLO,  0x80,
-FBRLO, 0x80,
-FGRLO, 0x80,
-FRRLO, 0x80,
-FPRLO, 0x80,
-RBLO,  0xFF,
-RGLO,  0xFF,
-RRLO,  0xFF,
-RPLO,  0xFF,
-ALO,   0xFF
-
-};
 
 
 //  Return of 0x02 implies success, 0x01 implies error.

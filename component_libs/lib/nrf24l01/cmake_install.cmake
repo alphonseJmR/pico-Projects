@@ -1,4 +1,4 @@
-# Install script for directory: /home/alphonse/Downloads/pico-Projects-main/rc_reciever_revision_1/lib/nrf24l01
+# Install script for directory: /home/alphonse/Downloads/pico-Projects-main/Controller_Revision_Two/lib/nrf24l01
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,9 +39,9 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/alphonse/Downloads/pico-Projects-main/rc_reciever_revision_1/lib/nrf24l01/spi_manager/cmake_install.cmake")
-  include("/home/alphonse/Downloads/pico-Projects-main/rc_reciever_revision_1/lib/nrf24l01/pin_manager/cmake_install.cmake")
-  include("/home/alphonse/Downloads/pico-Projects-main/rc_reciever_revision_1/lib/nrf24l01/error_manager/cmake_install.cmake")
+  include("/home/alphonse/Downloads/pico-Projects-main/Controller_Revision_Two/lib/nrf24l01/spi_manager/cmake_install.cmake")
+  include("/home/alphonse/Downloads/pico-Projects-main/Controller_Revision_Two/lib/nrf24l01/pin_manager/cmake_install.cmake")
+  include("/home/alphonse/Downloads/pico-Projects-main/Controller_Revision_Two/lib/nrf24l01/error_manager/cmake_install.cmake")
 
 endif()
 

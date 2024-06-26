@@ -1,6 +1,8 @@
 #ifndef POLY_TOOL_S_H
 #define POLY_TOOL_S_H
 
+
+
 /*
     COMMENT OUT ANY TOOL NOT BEING USED.  (caution: may be good chance to look for dependency errors.)
 
@@ -11,7 +13,7 @@
 #define PERI_TOOL
 // #define PICO_COMS
 #define RAND_TOOL
-#define SCREEN_TOOL
+// #define SCREEN_TOOL
 #define NRF_TOOL
 
 #include <stdio.h>
@@ -35,16 +37,20 @@
 //  These headers are I/O's for the pico.
 #ifdef PERI_TOOL
 
-// #include "Periphereals/dc_motors.h"
-#include "Periphereals/interrupt_handler.h"
-#include "Periphereals/resources/pico_adc_input.h"
+// #include "Periphereals/interrupt_handler.h"
+// #include "Periphereals/interrupt_handler/interrupt_main_handler.h"
+// #include "Periphereals/interrupt_handler/interrupt_structs.h"
+// #include "Periphereals/resources/pico_adc_input.h"
 #include "Periphereals/resources/pico_pin_enum.h"
 // #include "Periphereals/resources/rand_funcs.h"
-#include "Periphereals/shift_registers.h"
+// #include "Periphereals/shift_registers.h"
 // #include "Periphereals/sn74hc595.h"
 // #include "Periphereals/ultra_sonic_sensor.h"
 // #include "Periphereals/resources/Rc_RGB_Combinations.h"
-// #include "Periphereals/pwm_motor_controller.h"
+#include "Periphereals/Motors/dc_motors.h"
+#include "Periphereals/Motors/servo_motors.h"
+// #include "Periphereals/Motors/stepper_motors.h"
+
 
 #endif
 
@@ -60,8 +66,6 @@
 //  These headers are random project headers, probably useless.
 #ifdef RAND_TOOL
 
-// #include "rand_lib/pwm_gener.h"
-// #include "rand_lib/pwm_interrupt_mine.h"
 #include "rand_lib/rc_nrf_configs.h"
 
 #endif
@@ -77,6 +81,7 @@
 
 #include "Screen_lib/_2004A_lcd/_2004A_commands.h"
 // #include "Screen_lib/_2004A_lcd/_2004a_i2c.h"
+// #include "Screen_lib/_2004A_lcd/2004a_6wire_communication.h"
 #include "Screen_lib/_2004A_lcd/2004A_4bit_wire.h"
 #include "Screen_lib/_2004A_lcd/2004a_error_management.h"
 

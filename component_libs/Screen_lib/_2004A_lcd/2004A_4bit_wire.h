@@ -17,8 +17,8 @@
 
 #define ebit uint8_t
 
-#define lcd_rs_pin 8
-#define lcd_e_pin 9
+#define lcd_rs_pin 14
+#define lcd_e_pin 15
 
 typedef struct lcd_line_data
 {
@@ -211,7 +211,7 @@ void register_nibble(register_pins *pins, ebit input_data)
           gpio_put(pins->register_clk_line, 1);
 
           gpio_put(pins->register_one_data, (((input_data >> i) & 0x01)));
-          (i != 7) ? printf("%i", ((input_data >> i) & 0x01)) : printf("%i\n", ((input_data >> i) & 0x01));
+        //  (i != 7) ? printf("%i", ((input_data >> i) & 0x01)) : printf("%i\n", ((input_data >> i) & 0x01));
           
               sleep_us(5);
             gpio_put(pins->register_clk_line, 0);
@@ -230,12 +230,12 @@ void register_byte(register_pins *pins, ebit data_byte)
 
   ebit LSB, MSB;
   LSB, MSB= 0;
-    printf("\n//// Input Byte: 0x%02x. ////\n", data_byte);
+//    printf("\n//// Input Byte: 0x%02x. ////\n", data_byte);
   
   MSB = ((data_byte >> 4) & 0x0F);
   LSB = (data_byte & 0x0F);
   
-  printf("////  MSB: 0x%02x ////\n////  LSB: 0x%02x ////\n", MSB, LSB);
+//  printf("////  MSB: 0x%02x ////\n////  LSB: 0x%02x ////\n", MSB, LSB);
 
     gpio_put(lcd_e_pin, 0);
       sleep_us(10);
@@ -272,7 +272,7 @@ func_akk pico_char_to_lcd(register_pins *pins, ebit character)
  // printf("mcu->lcd: char\n");
   rs_high(lcd_rs_pin);
     sleep_us(50);
-    printf("Char: %c.\n", character);
+//    printf("Char: %c.\n", character);
   register_byte(pins, character);
 
   return device_data_success;
@@ -311,7 +311,7 @@ func_akk pico_to_clear_lcd(register_pins *pins){
 
 void pico_to_return_lcd_home(register_pins *pins){
 
-  printf("\n//\tReturning Home\t//\n");
+//  printf("\n//\tReturning Home\t//\n");
     pico_com_to_lcd(pins, LCD_RETURNHOME);
   sleep_ms(5);
 }
@@ -347,8 +347,8 @@ func_akk pico_to_fill_screen_with_char(register_pins *pins, ebit special_filler)
 func_akk pico_set_lcd_cursor(register_pins *pins, ebit line, ebit position)
 {
 
-  printf("\n///\tSETTING LCD CURSOR POSITION\t///\n");
-  printf("//\tTo Line: %i\n//\tPosition: %i\n", line, position);
+//  printf("\n///\tSETTING LCD CURSOR POSITION\t///\n");
+// printf("//\tTo Line: %i\n//\tPosition: %i\n", line, position);
   
   ebit s;
   s = 0;
@@ -358,7 +358,7 @@ func_akk pico_set_lcd_cursor(register_pins *pins, ebit line, ebit position)
 
   ebit offset_lines[] = {0x00, 0x40, 0x14, 0x54};
   output_position = (LCD_SETDDRAMADDR + ( offset_lines[line] + position ));
-  printf("Output Line Position: 0x%02x.\n", output_position);
+//  printf("Output Line Position: 0x%02x.\n", output_position);
   s += pico_com_to_lcd(pins, output_position);
     sleep_us(500);
 
@@ -372,19 +372,19 @@ func_akk pico_to_lcd_line(register_pins *pins, char *data, ebit line_pos)
 
   pico_set_lcd_cursor(pins, line_pos, 0);
 
-  printf("\n//\t\tPICO_TO_LCD_LINE\t\t//\n");
+//  printf("\n//\t\tPICO_TO_LCD_LINE\t\t//\n");
   ebit status;
   status = 0;
 
   for (int i = 0; i < 20; i++)
   {
-    printf("Current Data: 0x%02x.\n", data[i]);
+//    printf("Current Data: 0x%02x.\n", data[i]);
     pico_char_to_lcd(pins, data[i]);
       sleep_us(5);
     status += 1;
   }
 
-  printf("//STATUS_VALUE:// %i.\n", status);
+//  printf("//STATUS_VALUE:// %i.\n", status);
   return (status > 0) ? device_data_success : err;
 }
 
@@ -423,16 +423,16 @@ func_akk pico_to_write_screen(register_pins *pins, char *l_one, char *l_two, cha
   status = 0;
 
   status += pico_to_lcd_line(pins, l_one, 0);
-    sleep_us(5);
+    sleep_us(10);
   
   status += pico_to_lcd_line(pins, l_two, 1);
-    sleep_us(5);
+    sleep_us(10);
 
   status += pico_to_lcd_line(pins, l_three, 2);
-    sleep_us(5);
+    sleep_us(10);
 
   status += pico_to_lcd_line(pins, l_four, 3);
-    sleep_us(5);
+    sleep_us(10);
 
   return (status == 12) ? device_data_success : err;
 }
@@ -451,25 +451,13 @@ func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t i
   status += 1;
   sprintf(line->line_four, "FL: %02x RL: %02x ", (colors & 0xF0), (colors & 0x0F));
   status += 1;
-  printf("Status: %i.\n", status);
+//  printf("Status: %i.\n", status);
 
     pico_to_return_lcd_home(pins);
       sleep_us(50);
 
   //  pico_to_clear_lcd(pins);
-      sleep_us(10);
-
-
   status += pico_to_write_screen(pins, line->line_one, line->line_two, line->line_three, line->line_four);
-  printf("Status: %i.\n", status);
-  printf("\n\t\t////  ////  ////  ////  ////  ////  ////  ////\n");
-  printf("..\t\t\tLCD Screen Estimated Display\t\t\t..\n");
-  printf("\t\tRC Controller: Active\n");
-  printf("\t\tVer: %04x| Hor: %04x\n", in_one, in_two);
-  printf("\t\tVRoom Amount:P %04x\n", in_three);
-  printf("\t\tHead: %02xRear: %02x\n", (colors & 0xF0), (colors & 0x0F));
-printf("\n");
-  printf("\t\t////  ////  ////  ////  ////  ////  ////  ////\n");
 
   return (status == 8) ? device_data_success : err;
 }

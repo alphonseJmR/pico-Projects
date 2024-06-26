@@ -1,8 +1,6 @@
 #ifndef PICO_PIN_ENUMERATION_S_H
 #define PICO_PIN_ENUMERATION_S_H
 
-#include <stdio.h>
-#include "pico/stdlib.h"
 
 enum pico_pins {
   UNDEFINED = -1,

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "resources/pico_pin_enum.h"
-#include "pico/stdlib.h"
+#include "hardware/timer.h"
 #include "hardware/gpio.h"
 
 typedef struct {
@@ -73,7 +73,7 @@ typedef struct {
 void enabled_button_callback(uint gpio, uint32_t events){
 
    printf("Original Callback Function Occured:\n \tPin: %d.\n\tEvent: %d.\n", gpio, events);
- 
+    gpio_acknowledge_irq(gpio, events);
   //  Main callback interruption time.
   callback_times.current_interruption = time_us_32();
   callback_times.last_interruption = callback_times.current_interruption - callback_times.initial_interruption; 
@@ -90,8 +90,7 @@ void enabled_button_callback(uint gpio, uint32_t events){
 
       printf("\nInterruption occured:\n\tLast Interrupt: %u.\n", callback_times.last_interruption);
     callback_times.initial_interruption = callback_times.current_interruption;
-    gpio_acknowledge_irq(gpio, events);
-  
+
   if(callback_times.rotary_last > rotary.minimum_required_interrupt){
     callback_times.rotary_initial = callback_times.rei_current_interrupt;
   
@@ -100,11 +99,7 @@ void enabled_button_callback(uint gpio, uint32_t events){
       rotary.current_rotary_dt = gpio_get(enabled_buttons.rotary_button_dt);
       
       if(rotary.current_rotary_clk != rotary.previous_rotary_clk){
-        //  printf("Clk Status Changed.\n");
-        //  printf("CLK Current Status: %i.\n", rotary.current_rotary_clk);
-        //  printf("DT Current Status: %i.\n", rotary.current_rotary_dt);
         if(rotary.current_rotary_dt != rotary.current_rotary_clk){
-        //  printf("B != A.\n");
             if(rotary.rotary_total <= rotary.max_rotation_value){
           rotary.rotary_total += 25;
             }else {
@@ -112,7 +107,6 @@ void enabled_button_callback(uint gpio, uint32_t events){
             }
          
         }else {
-          //  printf("B == A.\n");
             if(rotary.rotary_total > 0){
             rotary.rotary_total -= 25;
             } else {

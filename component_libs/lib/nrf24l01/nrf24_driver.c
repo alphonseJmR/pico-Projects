@@ -66,14 +66,14 @@ typedef struct nrf_driver_s
  * user_config structs and for mode value
  */
 nrf_driver_t nrf_driver = { 
-  .user_spi.baudrate = 7000000,
+  .user_spi.baudrate = 5000000,
   .user_spi.instance = spi0,
   .user_config.address_width = AW_5_BYTES,
   .user_config.dyn_payloads = DYNPD_DISABLE,
   .user_config.retr_delay = ARD_500US,
   .user_config.retr_count = ARC_10RT,
   .user_config.data_rate = RF_DR_1MBPS,
-  .user_config.power = RF_PWR_0DBM,
+  .user_config.power = RF_PWR_NEG_18DBM,
   .user_config.channel = 110,
   .address_width_bytes = FIVE_BYTES,
   .is_rx_addr_p0 = false,
@@ -164,6 +164,7 @@ fn_status_t nrf_driver_configure(pin_manager_t *user_pins, uint32_t baudrate_hz)
       // store baudrate & SPI instance in global nrf_driver
       spi->baudrate = (baudrate_hz > 7500000) ? 7500000 : baudrate_hz;
       spi->instance = (count[SPI_0] == 3) ? spi0 : spi1;
+      printf("Instance: SPI%i.\n", (count[SPI_0] == 3) ? 0 : 1);
     }
   }
 
@@ -776,6 +777,8 @@ fn_status_t nrf_driver_standby_mode(void) {
  * 
  * @return SPI_MNGR_OK (2), ERROR (0)
  */
+
+
 fn_status_t nrf_driver_send_packet(const void *tx_packet, size_t size) {
 
   if (nrf_driver.mode == RX_MODE) { 

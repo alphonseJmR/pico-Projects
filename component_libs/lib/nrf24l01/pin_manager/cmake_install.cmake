@@ -1,4 +1,4 @@
-# Install script for directory: /home/alphonse/Downloads/pico-Projects-main/rc_reciever_revision_1/lib/nrf24l01/pin_manager
+# Install script for directory: /home/alphonse/Downloads/pico-Projects-main/Controller_Revision_Two/lib/nrf24l01/pin_manager
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

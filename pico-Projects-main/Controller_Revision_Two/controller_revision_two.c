@@ -5,28 +5,22 @@
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 
-
-
+#define client_transmitter
 #define ebit uint8_t
+bool nrf_reset;
+uint8_t transmit_NCS, transmit_RAN;
+uint8_t nrf_initial_bypass;
 uint8_t char_val;
-
+uint64_t time_sent, time_reply;
+fn_status_t success = 0;
 uint8_t function_status_checker;
-uint16_t rot_buf;
-int rgb_cycle;
-ebit initialise_sequence;
 
-/*
-lcd_pins my_lpins = {
-
-  .RS = 8,
-  .Enable = 9,
-  .A = 11,
-  .B = 12,
-  .C = 19,
-  .D = 20
-
+uint8_t pipe_line_addr[4][5] = {
+  {0x37,0x37,0x37,0x37,0x37},
+  {0xC7,0xC7,0xC7,0xC7,0xC7},
+  {0xC8,0xC7,0xC7,0xC7,0xC7},
+  {0xC9,0xC7,0xC7,0xC7,0xC7}
 };
-*/
 
 register_pins my_regi = {
 
@@ -43,40 +37,23 @@ register_pins my_regi = {
   };
 
 
-button_types enabled_buttons = {
+payload_data my_loads = {
 
-  .rotary_button_clk = GPIO_THIRTEEN,
-  .rotary_button_dt = GPIO_FIFTEEN,
-  .rotary_button_button = GPIO_EIGHTEEN,
-  .analog_button_one = GPIO_FOURTEEN,
-  .analog_button_two = UNDEFINED,
-  .button_one = UNDEFINED,
-  .button_two = UNDEFINED,
-  .button_three = UNDEFINED
+  .ready_load.load_zero = 0,
+  .ready_load.load_vert_data.vert_upper = 0,
+  .ready_load.load_vert_data.vert_lower = 0,
+  .ready_load.load_hori_data.hori_upper = 0,
+  .ready_load.load_hori_data.hori_lower = 0,
+  .ready_load.load_two = 0,
+  .ready_load.load_three = 0,
 
-};
-
-payload_data my_loads = { 
-
-  .ready_load = {
-    .load_zero = 0,
-    .load_one_dual = {
-    .vertical_buffer = 0,
-    .horizontal_buffer = 0
-  },
-    .load_two = 0,
-    .load_three = 0
-  },
-
-  .payload_buffer = {
-    .load_zero_buffer = 0,
-    .load_one_buffer = {
-      .vertical_analog_buffer = 0,
-      .horizontal_analog_buffer = 0
-    },
-    .load_two_buffer = 0,
-    .load_three_buffer = 0
-  }
+  .payload_buffer.load_zero_buffer = 0,
+  .payload_buffer.load_vert_buffer.vert_upper_buf = 0,
+  .payload_buffer.load_vert_buffer.vert_lower_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_upper_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_lower_buf = 0,
+  .payload_buffer.load_two_buffer = 0,
+  .payload_buffer.load_three_buffer = 0
 
 };
 
@@ -111,20 +88,6 @@ adc_port_values my_adc = {
     .adc2_mapped_float = 0
 };
 
-interrupt_times_t callback_times = {
-  .clk_max = 1500,
-  .dt_max = 1500,
-  .button_max = 1000,
-  .interruption_max = 1500
-};
-
-rotary_encoder_struct rotary = {
-
-  .max_rotation_value = 500,
-  .minimum_required_interrupt = 2000
-
-};
-
 pin_manager_t my_pins = { 
 
     .sck = GPIO_TWO,
@@ -135,9 +98,10 @@ pin_manager_t my_pins = {
 
   };
 
+
 nrf_manager_t my_config = {
     // RF Channel 
-    .channel = 120,
+    .channel = 110,
 
     // AW_3_BYTES, AW_4_BYTES, AW_5_BYTES
     .address_width = AW_5_BYTES,
@@ -146,10 +110,10 @@ nrf_manager_t my_config = {
     .dyn_payloads = DYNPD_ENABLE,
 
     // data rate: RF_DR_250KBPS, RF_DR_1MBPS, RF_DR_2MBPS
-    .data_rate = RF_DR_1MBPS,
+    .data_rate = RF_DR_250KBPS,
 
     // RF_PWR_NEG_18DBM, RF_PWR_NEG_12DBM, RF_PWR_NEG_6DBM, RF_PWR_0DBM
-    .power = RF_PWR_NEG_12DBM,
+    .power = RF_PWR_NEG_18DBM,
 
     // retransmission count: ARC_NONE...ARC_15RT
     .retr_count = ARC_10RT,
@@ -159,41 +123,162 @@ nrf_manager_t my_config = {
   };
 
 
-void test_line(void){
+void nrf_client_configured(nrf_client_t *client, pin_manager_t *pins, nrf_manager_t *config, uint32_t baudrate){
 
-  pico_to_clear_lcd(&my_regi);
-    sleep_us(10);
-  pico_set_lcd_cursor(&my_regi, 0, 0);
-    sleep_us(10);
-  
-  for(int i = 0; i < 20; i++){
+  printf("Configuring NRF Client.\n");
+  uint8_t nrf_status;
 
-    pico_char_to_lcd(&my_regi, 0x73);
-      sleep_us(5);
+  time_sent, time_reply = 0;
+  nrf_status = 0;
 
-  }
-  
-    sleep_us(10);
-  pico_set_lcd_cursor(&my_regi, 2, 0);
-    sleep_us(10);
-  
-  for(int j = 0; j < 20; j++){
 
-    pico_char_to_lcd(&my_regi, 0x65);
-      sleep_us(5);
+#ifdef client_transmitter
 
-  }
+nrf_status = nrf_driver_create_client(client);
+  printf("NRF Transmitter Client Created.\n");
+
+client->configure(pins, baudrate);
+client->initialise(config);
+
+client->standby_mode();
+
+#endif
+
+#ifdef client_receiver
+
+nrf_status = nrf_driver_create_client(client);
+  printf("NRF Reciever Client Created.\n");
+
+client->configure(pins, baudrate);
+client->initialise(config);
+
+client->rx_destination(DATA_PIPE_0, (uint8_t[]){0x37,0x37,0x37,0x37,0x37});
+client->rx_destination(DATA_PIPE_1, (uint8_t[]){0xC7,0xC7,0xC7,0xC7,0xC7});
+client->rx_destination(DATA_PIPE_2, (uint8_t[]){0xC8,0xC7,0xC7,0xC7,0xC7});
+client->rx_destination(DATA_PIPE_3, (uint8_t[]){0xC9,0xC7,0xC7,0xC7,0xC7});
+
+client->receiver_mode();
+
+#endif
 
 
 }
-int main() {
-  initialise_sequence = 0;
-  function_status_checker = 0x00;
-  rot_buf = 0x0000;
 
-  char_val = 0x65;
+void nrf_packet_transmit(nrf_client_t *client, payload_data *data, uint8_t address, uint8_t load_num){
+
+  printf("\n////\tNRF Transmitting\t////\n");
+
+  switch(load_num){
+
+    case 1:
+
+      client->tx_destination(pipe_line_addr[address]);
+      time_sent = to_us_since_boot(get_absolute_time());
+      success = client->send_packet(&data->payload_buffer.load_zero_buffer, sizeof(data->payload_buffer.load_zero_buffer));
+      time_reply = to_us_since_boot(get_absolute_time());
+    if(success) {
+        transmit_NCS = 0;
+      printf("Packet sent:- Response: %lluuS | Payload: 0x%04x\n", (time_reply - time_sent), data->payload_buffer.load_zero_buffer);
+    }else{
+
+      printf("\nPacket not sent:- Receiver not available.\n");
+    }
+    break;
+
+  case 2:
+
+      client->tx_destination(pipe_line_addr[address]);
+
+      time_sent = to_us_since_boot(get_absolute_time());
+      printf("Packet: Vertical Struct: 0x%04x\n", data->ready_load.load_vert_data);
+      success = client->send_packet(&data->ready_load.load_vert_data, sizeof(data->ready_load.load_vert_data));
+      time_reply = to_us_since_boot(get_absolute_time());
+        if(success) {
+          transmit_NCS = 0;
+          printf("Packet sent:- Response: %lluuS | Payload Upper: 0x%02x | Payload Lower: 0x%02x\n", (time_reply - time_sent), (data->ready_load.load_vert_data.vert_upper), (data->ready_load.load_vert_data.vert_lower));
+        }else{
+          printf("\nPacket not sent:- Receiver not available.\n");
+        }
+
+    break;
+
+  case 3:
+
+      client->tx_destination(pipe_line_addr[address]);
+      time_sent = to_us_since_boot(get_absolute_time());
+      success = client->send_packet(&data->ready_load.load_hori_data, sizeof(data->ready_load.load_hori_data));
+      time_reply = to_us_since_boot(get_absolute_time());
+
+    if(success) {
+        transmit_NCS = 0;
+      printf("Packet sent:- Response: %lluuS | Payload Upper: 0x%02x | Payload Lower: 0x%02x\n", (time_reply - time_sent), data->ready_load.load_hori_data.hori_upper, data->ready_load.load_hori_data.hori_lower);
+    }else{
+
+      printf("\nPacket not sent:- Receiver not available.\n");
+    }
+    break;
+
+  case 4:
+
+      client->tx_destination(pipe_line_addr[address]);
+      time_sent = to_us_since_boot(get_absolute_time());
+      success = client->send_packet(&data->payload_buffer.load_three_buffer, sizeof(data->payload_buffer.load_three_buffer));
+      time_reply = to_us_since_boot(get_absolute_time());
+      
+    if(success) {
+        transmit_NCS = 0;
+      printf("Packet sent:- Response: %lluuS | Payload: 0x%04x\n", (time_reply - time_sent), data->payload_buffer.load_three_buffer);
+    }else{
+      printf("\nPacket not sent:- Receiver not available.\n");
+    }
+    break;
+
+  default:
+
+    printf("Non-payload # selected.\n");
+    break;
+
+  }
+  
+  (success > 0) ? transmit_NCS = 0 : transmit_NCS++;
+
+}
+
+void nrf_rc_update(nrf_client_t* client){
+
+  printf("Sending All Data to RC Car.\n");
+
+    printf("\n// // //\tPayload Zero\t// // //\n");
+    nrf_packet_transmit(client, &my_loads, 0, 1);
+    printf("// // //\tPayload One\t// // //\n");
+      nrf_packet_transmit(client, &my_loads, 1, 2);
+    printf("// // //\tPayload Two\t// // //\n");
+        nrf_packet_transmit(client, &my_loads, 2, 3);
+    printf("// // //\tPayload Three\t// // //\n");
+          nrf_packet_transmit(client, &my_loads, 3, 4);
+
+    if(transmit_NCS > 59){
+        nrf_reset = true;
+        transmit_RAN++;
+        transmit_NCS = 0;
+      }else{
+        printf("\n// //\tNo Connection Attempts: %i\t// //\n", transmit_NCS);
+      }
+
+}
+
+
+int main() {
+
+
+  function_status_checker = 0x00;
+  nrf_reset = false;
+  transmit_NCS, transmit_RAN = 0;
+  nrf_initial_bypass = 1;
 
   stdio_init_all();
+
+  printf("RC Controller Program Initialising.\n");
 //  Sleep arbitrary amount of seconds to allow user to connect to serial monitor.
       sleep_ms(7000);
       sleep_ms(7000);
@@ -201,165 +286,70 @@ int main() {
 //  Initialise ADC PORT's.
       adc_init();
       adc_pin_setup(&my_adc);
+        sleep_ms(200);
 
 //  Initialize pin setup for rotary encoder.
-      rotary_encoder_init(&enabled_buttons);
-      button_interrupt_init(&enabled_buttons);
+      interruption_input_initialisation(&my_types);
+        sleep_ms(200);
 
 //  Initialize pin setup for cd74hc595e(s).
       setup_my_registers(&my_regi);
         sleep_ms(200);
-  //  init_lcd_pins(&my_lpins);
 
 //  Initialize LCD for control interface.
-  pico_lcd_initialise(&my_regi);
-    sleep_ms(200);
-  //  lcd_init_sequence(&my_lpins);
-
-
-  // SPI baudrate
-  uint32_t my_baudrate = 5000000;
+      pico_lcd_initialise(&my_regi);
+        sleep_ms(200);
 
   nrf_client_t my_nrf;
 
-  // initialise my_nrf
-  initialise_sequence += nrf_driver_create_client(&my_nrf);
-
-  // configure GPIO pins and SPI
-  my_nrf.configure(&my_pins, my_baudrate);
-
-  // not using default configuration (my_nrf.initialise(NULL)) 
-  my_nrf.initialise(&my_config);
-
-  // set to Standby-I Mode
-  my_nrf.standby_mode();
-
+  nrf_client_configured(&my_nrf, &my_pins, &my_config, 5000000);
   // result of packet transmission
-  fn_status_t success = 0;
 
-  uint64_t time_sent = 0; // time packet was sent
-  uint64_t time_reply = 0; // response time after packet sent
-
-  // initialize_print_debug(&my_config, &my_pins, my_baudrate);
-  printf("\n\n\nInitialisation Sequence Ended With Value: %i.\n\n", initialise_sequence);
-    sleep_ms(2500);
-
-  (initialise_sequence == 4) ? printf("\n\n//START PROGRAM//\n\n") : printf("\n\n//ABORT PROGRAM//\n\tSequence BEQ:\n\n", initialise_sequence);
-  
-  uint8_t rand;
-  rand = 0;
+  sleep_ms(2500);
 
 while(1) {
 
-  printf("\n");
-  rot_buf = 0;
-  adc_pin_call(&my_adc);
-  rot_buf = rotary.rotary_total;
-  sleep_ms(500);
+  if(nrf_initial_bypass == 1){
+    printf("NRF Client Active.\n");
+    nrf_reset = false;
+    nrf_initial_bypass = 0;
+  sleep_ms(1000);
+        printf("Beginning Operation\n");
+  sleep_ms(1000);
+  }else {
 
- pico_to_default_screen(&my_regi, &my_lcd_lines, my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, rot_buf, 0x36);
-      sleep_ms(4000);
+    nrf_client_configured(&my_nrf, &my_pins, &my_config, 5000000);
+    printf("Re-Activating NRF Client.\n");
+    nrf_reset = false;
+    transmit_NCS = 0;
+      printf("////\tNum of Reset: %i\t////\n", transmit_RAN);
+      sleep_ms(1000);
+          printf("Resuming Operation\n");
+      sleep_ms(1000);
+  }
 
-//  lcd_default_display(&my_lpins,  my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, rot_buf, 0x36);
+  while(!nrf_reset){
 
-
-//  Begin Transmitting RF data.
-
-/*
-  for(int zv = 0; zv < 1; zv++)
-  {
+    printf("\n");
+    printf("Value of Butt->button_value: %i.\n", my_types.button_value);
     
-      printf("Pipeline 0.\n");
-
-    // send to receiver's DATA_PIPE_0 address
-      my_nrf.tx_destination((uint8_t[]){0x37,0x37,0x37,0x37,0x37});
-      printf("Step 1.\n");
-    // time packet was sent
-      time_sent = to_us_since_boot(get_absolute_time()); // time sent
-      printf("Step 2.\n");
-    // send packet to receiver's DATA_PIPE_0 address
-      printf("\n Sending: 0b%04x.\n", my_loads.payload_buffer.load_zero_buffer);
-      success = my_nrf.send_packet(&my_loads.payload_buffer.load_zero_buffer, sizeof((my_loads.payload_buffer.load_zero_buffer)));
-      printf("Step 3.\n");
-    // time auto-acknowledge was received
-      time_reply = to_us_since_boot(get_absolute_time()); // response time
-      
-    if (success)
-    {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x.\n", time_reply - time_sent, (my_loads.payload_buffer.load_zero_buffer));
-
-    } 
-    else
-    {
-      printf("\nPacket not sent:- Receiver not available.\n");
-    }
-
-
-      printf("Pipeline 1.\n");
-    // send to receiver's DATA_PIPE_1 address
-      my_nrf.tx_destination((uint8_t[]){0xC7,0xC7,0xC7,0xC7,0xC7});
-    // time packet was sent
-      time_sent = to_us_since_boot(get_absolute_time()); // time sent
-    // send packet to receiver's DATA_PIPE_1 address
-      printf("\n Sending: 0b%04x.\n", (my_loads.payload_buffer.load_one_buffer.vertical_analog_buffer));
-      printf("\n Sending: 0b%04x.\n", my_loads.payload_buffer.load_one_buffer.horizontal_analog_buffer);
-      success = my_nrf.send_packet(&my_loads.payload_buffer.load_one_buffer, sizeof(my_loads.payload_buffer.load_one_buffer));
-    // time auto-acknowledge was received
-      time_reply = to_us_since_boot(get_absolute_time()); // response time
-    if (success)
-    {
-        printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x & 0b%04x.\n",time_reply - time_sent, my_loads.payload_buffer.load_one_buffer.vertical_analog_buffer, my_loads.payload_buffer.load_one_buffer.horizontal_analog_buffer);
-    }
-    else
-    {
-      printf("\nPacket not sent:- Receiver not available.\n");
-    }
-          
-      printf("Pipeline 2.\n");
-    // send to receiver's DATA_PIPE_2 address
-      my_nrf.tx_destination((uint8_t[]){0xC8,0xC7,0xC7,0xC7,0xC7});
-    // time packet was sent
-      time_sent = to_us_since_boot(get_absolute_time()); // time sent
-    // send packet to receiver's DATA_PIPE_2 address
-      printf("\n Sending: 0b%04x.\n", my_loads.payload_buffer.load_two_buffer);
-      success = my_nrf.send_packet(&my_loads.payload_buffer.load_two_buffer, sizeof(my_loads.payload_buffer.load_two_buffer));
-    // time auto-acknowledge was received
-      time_reply = to_us_since_boot(get_absolute_time()); // response time
-    if (success)
-    {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%04x.\n", time_reply - time_sent, my_loads.payload_buffer.load_two_buffer);
-    }
-    else
-    {
-      printf("\nPacket not sent:- Receiver not available.\n");
-    }
-
-      printf("Pipeline Three.\n");
-    // send to receiver's DATA_PIPE_3 address
-      my_nrf.tx_destination((uint8_t[]){0xC9,0xC7,0xC7,0xC7,0xC7});
-    // time packet was sent
-      time_sent = to_us_since_boot(get_absolute_time()); // time sent
-    // send packet to receiver's DATA_PIPE_3 address
-      printf("\n Sending: 0b%08x.\n", my_loads.payload_buffer.load_three_buffer);
-      success = my_nrf.send_packet(&my_loads.payload_buffer.load_three_buffer, sizeof(my_loads.payload_buffer.load_three_buffer));
-    // time auto-acknowledge was received
-      time_reply = to_us_since_boot(get_absolute_time()); // response time
-    if (success)
-    {
-      printf("\nPacket sent:- Response: %lluμS | Payload: 0b%08x.\n", time_reply - time_sent, my_loads.payload_buffer.load_three_buffer);
-    }
-    else
-    {
-      printf("\nPacket not sent:- Receiver not available.\n");
-    }
-
-    }    
-  
-
-*/
-  sleep_ms(500);
-    printf("\n\nNext Iteration?\n");
+    adc_pin_call(&my_adc);
     
+      sleep_ms(200);
+    pico_to_default_screen(&my_regi, &my_lcd_lines, my_adc.adc1_mapped_value, my_adc.adc2_mapped_value, my_types.button_value, 0x36);
+      sleep_ms(200);
+
+    printf("\n");
+    
+    buffer_payload(&my_loads, my_types.button_value, my_adc.adc1_mapped_value, my_adc.adc2_mapped_value);
+    sleep_ms(10);
+      nrf_rc_update(&my_nrf);
+    sleep_ms(10);
+
+    printf("\n");
+
+
+  }
 }
 tight_loop_contents();
 }

@@ -2,51 +2,89 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "pico/stdlib.h"
 #include "Poly_Tools.h"
 
+#define client_receiver
+uint8_t nrf_initial_loop;
+//  nrf_NCS = No Connections
+//  nrf_RAN = Restart Attempt Nums
+uint8_t nrf_NCS, nrf_RAN;
+bool nrf_reset;
+uint16_t previous_position;
 
-registered_pins my_regis = {
+uint16_t sent_vertical_value;
+uint16_t sent_horizontal_value;
 
-  .DATA_LINE_ONE = GPIO_FIVE,
-  .LATCH_LINE_ONE = GPIO_THREE,
-  .ENABLE_LINE_ONE = GPIO_FOUR,
-  .DATA_LINE_TWO = UNDEFINED,
-  .LATCH_LINE_TWO = UNDEFINED,
-  .ENABLE_LINE_TWO = UNDEFINED,
-  .REGISTERS_CLK_LINE = GPIO_TWO
+uint8_t pipe_number;
+
+
+pin_manager_t my_pins = { 
+
+    .sck = GPIO_EIGHTEEN,
+    .mosi = GPIO_NINETEEN, 
+    .miso = GPIO_SIXTEEN, 
+    .csn = GPIO_SEVENTEEN, 
+    .ce = GPIO_FIFTEEN
+
+};
+
+servo_motor my_servo = {
+
+  .my_perv.servo_pin_one = GPIO_TEN,
+  .my_perv.servo_pin_two = UNDEFINED,
+
+  .my_serv.servo_wrap_one = 39062.f,
+  .my_serv.servo_one_level = 0,
+
+  .my_serv.servo_middle_ground = 752
+
+};
+
+dc_motor my_dc = {
+
+  .my_dc_pins.motor_one_forward = GPIO_TWELVE,
+  .my_dc_pins.motor_one_reverse = GPIO_THIRTEEN,
+
+  .my_dc_pins.motor_two_forward = UNDEFINED,
+  .my_dc_pins.motor_two_reverse = UNDEFINED,
+
+  .my_dc_pwm.dc_slice_one = 0,
+  .my_dc_pwm.dc_chan_one = 0,
+  .my_dc_pwm.dc_wrap_one = 0,
+  .my_dc_pwm.dc_one_level = 0,
+
+  .my_dc_pwm.dc_slice_two = 0,
+  .my_dc_pwm.dc_chan_two = 0,
+  .my_dc_pwm.dc_wrap_two = 0,
+  .my_dc_pwm.dc_two_level = 0
 
 };
 
 payload_data my_loads = {
 
   .ready_load.load_zero = 0,
-  .ready_load.load_one_dual.vertical_buffer = 0,
-  .ready_load.load_one_dual.horizontal_buffer = 0,
+  .ready_load.load_vert_data.vert_upper = 0,
+  .ready_load.load_vert_data.vert_lower = 0,
+  .ready_load.load_hori_data.hori_upper = 0,
+  .ready_load.load_hori_data.hori_lower = 0,
   .ready_load.load_two = 0,
   .ready_load.load_three = 0,
 
   .payload_buffer.load_zero_buffer = 0,
-  .payload_buffer.load_one_buffer.vertical_analog_buffer = 0,
-  .payload_buffer.load_one_buffer.horizontal_analog_buffer = 0,
+  .payload_buffer.load_vert_buffer.vert_upper_buf = 0,
+  .payload_buffer.load_vert_buffer.vert_lower_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_upper_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_lower_buf = 0,
   .payload_buffer.load_two_buffer = 0,
   .payload_buffer.load_three_buffer = 0
 
 };
 
-pin_manager_t my_pins = { 
-
-    .sck = GPIO_THIRTEEN,
-    .mosi = GPIO_TWELVE, 
-    .miso = GPIO_ELEVEN, 
-    .csn = GPIO_TEN, 
-    .ce = GPIO_NINE
-
-};
-
- nrf_manager_t my_config = {
+nrf_manager_t my_config = {
 
     // RF Channel 
-    .channel = 120,
+    .channel = 110,
 
     // AW_3_BYTES, AW_4_BYTES, AW_5_BYTES
     .address_width = AW_5_BYTES,
@@ -55,10 +93,10 @@ pin_manager_t my_pins = {
     .dyn_payloads = DYNPD_ENABLE,
 
     // data rate: RF_DR_250KBPS, RF_DR_1MBPS, RF_DR_2MBPS
-    .data_rate = RF_DR_1MBPS,
+    .data_rate = RF_DR_250KBPS,
 
     // RF_PWR_NEG_18DBM, RF_PWR_NEG_12DBM, RF_PWR_NEG_6DBM, RF_PWR_0DBM
-    .power = RF_PWR_NEG_12DBM,
+    .power = RF_PWR_NEG_18DBM,
 
     // retransmission count: ARC_NONE...ARC_15RT
     .retr_count = ARC_10RT,
@@ -68,104 +106,175 @@ pin_manager_t my_pins = {
   
 };
 
-int main () {
+void set_readied_values(payload_data *load){
+
+
+    if(nrf_NCS > 10){
+
+      my_loads.payload_buffer.load_vert_buffer.vert_upper_buf = 0x01;
+      my_loads.payload_buffer.load_vert_buffer.vert_lower_buf = 0xF9;
+      my_loads.payload_buffer.load_hori_buffer.hori_upper_buf = 0x01;
+      my_loads.payload_buffer.load_hori_buffer.hori_lower_buf = 0xF9;
+
+
+      sent_vertical_value = ((load->payload_buffer.load_vert_buffer.vert_upper_buf << 8) | (load->payload_buffer.load_vert_buffer.vert_lower_buf));
+      sent_horizontal_value = ((load->payload_buffer.load_hori_buffer.hori_upper_buf << 8) | (load->payload_buffer.load_hori_buffer.hori_lower_buf));
+      printf("\nVertical Data: 0x%04x.", sent_vertical_value);
+      printf("\nHorizontal Data: 0x%04x.\n", sent_horizontal_value);
+
+    }else{
+
+      sent_vertical_value = ((load->payload_buffer.load_vert_buffer.vert_upper_buf << 8) | (load->payload_buffer.load_vert_buffer.vert_lower_buf));
+      sent_horizontal_value = ((load->payload_buffer.load_hori_buffer.hori_upper_buf << 8) | (load->payload_buffer.load_hori_buffer.hori_lower_buf));
+      printf("\nVertical Data: 0x%04x.", sent_vertical_value);
+      printf("\nHorizontal Data: 0x%04x.\n", sent_horizontal_value);
+
+    }
+}
+
+void set_servo_turn(uint16_t horizontal_data){
+
+  printf("\n////\tSet Servo Turn\t////\n");
+
+  bool idle_turn;
+  idle_turn = false;
+
+  printf("///\tPrevious Position: %i.\t///\n", previous_position);
+
+    idle_turn = input_Test(495, 515, horizontal_data);
   
-  int pin_init;
-  pin_init = 0;
+  if(!idle_turn){
+    (!idle_turn) ? printf("Servo Turning.\n") :  printf("Servo Turn Idle\n");
 
-  int qprint, qprint_o;
-  qprint, qprint_o = 0;
+printf("Re-Enabling Servo PWM");
+    pwm_set_enabled(my_servo.my_serv.servo_slice_one, true);
+      sleep_us(200);
 
+    if(horizontal_data > 525){
+        printf("Horizontal Data: %i.\n", horizontal_data);
+      set_servo_position(10, &my_servo, 2300);
 
-   stdio_init_all();
+    }else if(horizontal_data < 485){
+      set_servo_position(10, &my_servo, 550);
+        printf("Horizontal Data: %i.\n", horizontal_data);
+    }
 
-  printf("RC Car Program Initialising.");
+    previous_position = horizontal_data;
 
-  sleep_ms(7000);
-  sleep_ms(7000);
+  }else{
 
-  pin_init += register_pin_initialisation(&my_regis);
+      if(previous_position != 1450){
+    
+        set_servo_position(10, &my_servo, 1450);
+        //  pwm_set_counter(my_servo.my_serv.servo_slice_one, 0);
+        sleep_us(200);
+          pwm_set_enabled(my_servo.my_serv.servo_slice_one, false);
+        previous_position = 1450;
 
-  (pin_init == 2) ? printf("\n\n////\tRegister Pins Init Success.\t////\n") : printf("\n\n////\tRegister Pins Init Failure.\t////\n");
+      }else {
 
-  // SPI baudrate
-  uint32_t my_baudrate = 5000000;
+            printf("Horizontal Data Irrelevent.\n");
 
-  // provides access to driver functions
-  nrf_client_t my_nrf;
-
-  // initialise my_nrf
-  nrf_driver_create_client(&my_nrf);
-
-  // configure GPIO pins and SPI
-  my_nrf.configure(&my_pins, my_baudrate);
-
-  // not using default configuration (my_nrf.initialise((int)NULL)) 
-  my_nrf.initialise(&my_config);
-
-  // * set addresses for DATA_PIPE_0 - DATA_PIPE_3.
-  // * These are addresses the transmitter will send its packets to.
-  
-  my_nrf.rx_destination(DATA_PIPE_0, (uint8_t[]){0x37,0x37,0x37,0x37,0x37});
-  my_nrf.rx_destination(DATA_PIPE_1, (uint8_t[]){0xC7,0xC7,0xC7,0xC7,0xC7});
-  my_nrf.rx_destination(DATA_PIPE_2, (uint8_t[]){0xC8,0xC7,0xC7,0xC7,0xC7});
-  my_nrf.rx_destination(DATA_PIPE_3, (uint8_t[]){0xC9,0xC7,0xC7,0xC7,0xC7});
-
-  // set to RX Mode
-  my_nrf.receiver_mode();
-
-  // data pipe number a packet was received on
-  uint8_t pipe_number = 0;
-
-  //  register_595_output(&my_regis, 0x15, false, 0xFF);
+      }
 
 
-while(1){
+  }
+    
+}
 
-  printf("\n\n////\tStart of main's while loop.\t////\n\n");
+void nrf_client_configured(nrf_client_t *client, pin_manager_t *pins, nrf_manager_t *config, uint32_t baudrate){
 
- snhc595_test(&my_regis, testing_values);
+  printf("Configuring NRF Client.\n");
+  uint8_t nrf_status;
+  uint64_t time_sent, time_reply;
 
-  sleep_ms(150);
+  time_sent, time_reply = 0;
+  nrf_status = 0;
 
-  if(my_nrf.is_packet(&pipe_number)){
-    printf("Pipeline: #%u\n", &pipe_number);
-    switch (pipe_number)
-    {
 
-      case DATA_PIPE_0:
-        // read payload
-        my_nrf.read_packet(&my_loads.payload_buffer.load_zero_buffer, sizeof(my_loads.payload_buffer.load_zero_buffer));
-        my_loads.ready_load.load_zero = my_loads.payload_buffer.load_zero_buffer;
+#ifdef client_transmitter
 
-        printf("\nPacket received:- Payload (0x%04x) on data pipe (%d)\n", my_loads.ready_load.load_zero, pipe_number);
+nrf_status = nrf_driver_create_client(client);
+  printf("NRF Transmitter Client Created.\n");
+
+client->configure(pins, baudrate);
+client->initialise(config);
+
+client->standby_mode();
+
+#endif
+
+#ifdef client_receiver
+
+nrf_status = nrf_driver_create_client(client);
+  printf("NRF Reciever Client Created.\n");
+
+client->configure(pins, baudrate);
+client->initialise(config);
+
+client->rx_destination(DATA_PIPE_0, (uint8_t[]){0x37,0x37,0x37,0x37,0x37});
+client->rx_destination(DATA_PIPE_1, (uint8_t[]){0xC7,0xC7,0xC7,0xC7,0xC7});
+client->rx_destination(DATA_PIPE_2, (uint8_t[]){0xC8,0xC7,0xC7,0xC7,0xC7});
+client->rx_destination(DATA_PIPE_3, (uint8_t[]){0xC9,0xC7,0xC7,0xC7,0xC7});
+
+client->receiver_mode();
+
+#endif
+
+
+}
+
+void nrf_check_received(nrf_client_t *client, payload_data *loads){
+
+  uint8_t success;
+  success = 0;
+
+  if(client->is_packet(&pipe_number)){
+    printf("Pipeline: #%i\n", &pipe_number);
+
+  switch (pipe_number){
+
+    case DATA_PIPE_0:
+      // read payload
+        client->read_packet(&loads->payload_buffer.load_zero_buffer, sizeof(loads->payload_buffer.load_zero_buffer));
+        loads->ready_load.load_zero = loads->payload_buffer.load_zero_buffer;
+
+        printf("\nPacket received:- Payload (0x%04x) on data pipe (%d)\n", loads->ready_load.load_zero, pipe_number);
+        nrf_NCS = 0;
       break;
 
       case DATA_PIPE_1:
         // read payload
-        my_nrf.read_packet(&my_loads.payload_buffer.load_one_buffer, sizeof(my_loads.payload_buffer.load_one_buffer));
-        my_loads.ready_load.load_one_dual.vertical_buffer = my_loads.payload_buffer.load_one_buffer.vertical_analog_buffer;
-        my_loads.ready_load.load_one_dual.horizontal_buffer = my_loads.payload_buffer.load_one_buffer.horizontal_analog_buffer;
-
-        qprint = my_loads.ready_load.load_one_dual.vertical_buffer;
-        qprint_o = my_loads.ready_load.load_one_dual.horizontal_buffer;
-        printf("\nPacket received:- Payload (1: 0x%04x, 2: 0x%08x) on data pipe (%d)\n", qprint, qprint_o, pipe_number);
+        success = client->read_packet(&loads->payload_buffer.load_vert_buffer, sizeof(loads->payload_buffer.load_vert_buffer));
+        if(success){
+        printf("\nPacket received:- Payload 0x%02x | Payload 0x%02x on data pipe (%d)\n", (loads->payload_buffer.load_vert_buffer.vert_upper_buf), (loads->payload_buffer.load_vert_buffer.vert_lower_buf), pipe_number);
+        }else {
+          printf("\n//\tVertical Data Not Received.\t//\n");
+          loads->payload_buffer.load_vert_buffer.vert_upper_buf = 0;
+          loads->payload_buffer.load_vert_buffer.vert_lower_buf = 0;
+        }
+        nrf_NCS = 0;
       break;
         
       case DATA_PIPE_2:
         // read payload
-        my_nrf.read_packet(&my_loads.payload_buffer.load_two_buffer, sizeof(my_loads.payload_buffer.load_two_buffer));
-        my_loads.ready_load.load_two = my_loads.payload_buffer.load_two_buffer;
-
-        printf("\nPacket received:- Payload (0x%04x) on data pipe (%d)\n", my_loads.ready_load.load_two, pipe_number);
+        success = client->read_packet(&loads->payload_buffer.load_hori_buffer, sizeof(loads->payload_buffer.load_hori_buffer));
+        if(success){
+          printf("\nPacket received:- Payload 0x%02x | Payload 0x%02x on data pipe (%d)\n", (loads->payload_buffer.load_hori_buffer.hori_upper_buf), (loads->payload_buffer.load_hori_buffer.hori_lower_buf), pipe_number);
+        }else {
+          printf("\n//\tHorizontal Data Not Received.\t//\n");
+          loads->payload_buffer.load_hori_buffer.hori_upper_buf = 0;
+          loads->payload_buffer.load_hori_buffer.hori_lower_buf = 0;
+        }
+        nrf_NCS = 0;
       break;
         
       case DATA_PIPE_3:
         // read payload
-        my_nrf.read_packet(&my_loads.payload_buffer.load_three_buffer, sizeof(my_loads.payload_buffer.load_three_buffer));
-        my_loads.ready_load.load_three = my_loads.payload_buffer.load_three_buffer;
-
-        printf("\nPacket received:- Payload (0x%04x) on data pipe (%d)\n", my_loads.ready_load.load_three, pipe_number);
+        client->read_packet(&loads->payload_buffer.load_three_buffer, sizeof(loads->payload_buffer.load_three_buffer));
+        loads->ready_load.load_three = loads->payload_buffer.load_three_buffer;
+        printf("\nPacket received:- Payload (0x%04x) on data pipe (%d)\n", loads->ready_load.load_three, pipe_number);
+        nrf_NCS = 0;
       break;
         
       case DATA_PIPE_4:
@@ -179,32 +288,87 @@ while(1){
         }
 
 } 
-else {
-
+    else {
   printf("No Data Received.\n\n");
+  nrf_NCS++;
   
 }
 
-  printf("\n\n");
-  printf("//Payload   Zero   BUFFER//: %u.\n", my_loads.payload_buffer.load_zero_buffer);
-  printf("//Payload  One V   BUFFER//: %u.\n", my_loads.payload_buffer.load_one_buffer.vertical_analog_buffer);
-  printf("//Payload  One H   BUFFER//: %u.\n", my_loads.payload_buffer.load_one_buffer.horizontal_analog_buffer);
-  printf("//Payload   Two    BUFFER//: %u.\n", my_loads.payload_buffer.load_two_buffer);
-  printf("//Payload  Three   BUFFER//: %u.\n\n", my_loads.payload_buffer.load_three_buffer);
-
-printf("\n\n");
-  sleep_ms(500);
-  
-  printf("//Payload   Zero   ACTIVE//: %u.\n", my_loads.ready_load.load_zero);
-  printf("//Payload  One V   ACTIVE//: %u.\n", my_loads.ready_load.load_one_dual.vertical_buffer);
-  printf("//Payload  One H   ACTIVE//: %u.\n", my_loads.ready_load.load_one_dual.horizontal_buffer);
-  printf("//Payload   Two    ACTIVE//: %u.\n", my_loads.ready_load.load_two);
-  printf("//Payload  Three   ACTIVE//: %u.\n\n", my_loads.ready_load.load_three);
-
-printf("\n\n");
-  sleep_ms(500);
 }
 
+
+int main () {
+  
+  int pin_init;
+  pin_init = 0;
+  nrf_reset = false;
+  nrf_initial_loop = 1;
+  nrf_NCS = 0;
+  nrf_RAN = 0;
+  previous_position = 0;
+
+   stdio_init_all();
+
+  printf("RC Car Program Initialising.");
+
+  sleep_ms(7000);
+  sleep_ms(7000);
+
+my_dc = initialise_dc_pwm_pins(&my_dc);
+    printf("\n\n");
+      sleep_ms(5000);
+servo_initialization(&my_servo);
+    printf("\n\n");
+      sleep_ms(5000);
+
+  // provides access to driver functions
+  nrf_client_t my_nrf;
+  pipe_number = 0;
+
+  nrf_client_configured(&my_nrf, &my_pins, &my_config, 5000000);
+
+
+//  set_servo_initial_position(&my_servo);
+
+while(1){
+
+  if(nrf_initial_loop == 1){
+
+      printf("NRF Client Active.\n");
+      nrf_reset = false;
+      nrf_initial_loop = 0;
+
+  }else{
+
+    nrf_client_configured(&my_nrf, &my_pins, &my_config, 5000000);
+    printf("NRF Client Re-Activated.\n");
+    nrf_reset = false;
+    printf("////\tNum of Resets: %i.\t////\n", nrf_RAN);
+      sleep_ms(1000);
+  }
+  
+  while(!nrf_reset){
+
+    printf("\n\n////\tMain Looping\t////\n\n");
+    sleep_ms(150);
+    nrf_check_received(&my_nrf, &my_loads);
+
+    if(nrf_NCS > 20){
+      nrf_reset = true;
+      nrf_RAN++;
+      nrf_NCS = 0;
+    }else{
+      printf("\n////\tNo Connection Attempts: %i\t////\n", nrf_NCS);
+    }
+
+    set_readied_values(&my_loads);
+
+    set_motor_values(&my_dc, sent_vertical_value, my_loads.ready_load.load_zero);
+    set_servo_turn(sent_horizontal_value);
+
+  }
+}
 tight_loop_contents();
 }
+
 

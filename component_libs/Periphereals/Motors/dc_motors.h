@@ -7,18 +7,24 @@
 #include "hardware/gpio.h"
 #include "hardware/pwm.h"
 #include "../resources/pico_pin_enum.h"
+#include "../../hi_lvl_resources/project_struct_s.h"
 
 #define inputAbove(a, b) (bool)((uint16_t)a > (uint16_t)b)
 #define inputBelow(a, b) (bool) ((uint16_t)a < (uint16_t)b)
-#define input_Test(a, b, c) (bool)( ( ((uint16_t)a <= (uint16_t)c ) & ((uint16_t)b >= (uint16_t)c) ))
+#define input_test(a, b, c) (bool)( ( ((uint16_t)a <= (uint16_t)c ) & ((uint16_t)b >= (uint16_t)c) ))
+
 
 #define analog_idle_min 1900
 #define analog_idle_max 2100
 
-bool analog_idle;
+#define drive_ai 12000
+#define drive_bi 3000
+
+
 uint16_t previous_anal;
 uint16_t cur_anal;
 
+uint16_t wrappen_duty[9];
 
 uint16_t five_K_inc_wrap[9] = {
     0x1388,
@@ -31,19 +37,21 @@ uint16_t five_K_inc_wrap[9] = {
     0x9C40,
     0xAFC8
 };
+
 uint16_t analog_checks[18] = {
 
     0x00, 0x70,
     0x71, 0xE1,
     0xE2, 0x152,
     0x153, 0x1C3,
-    0x1C4, 0x234,
-    0x235, 0x2A5,
+    0x1C4, 0x1EF,
+    0x20E, 0x2A5,
     0x2A6, 0x316,
     0x317, 0x387,
     0x388, 0x3FF
 
 };
+
 uint16_t rotary_checks[18] = {
 
     0x01, 0x31,
@@ -59,115 +67,107 @@ uint16_t rotary_checks[18] = {
 };
 
 
-//  Holds only two settings for two motors, forward, and reverse.
-typedef struct dc_motor_pin_s {
-
-    uint8_t motor_one_forward;
-    uint8_t motor_one_reverse;
-    
-    uint8_t motor_two_forward;
-    uint8_t motor_two_reverse;
-
-}dc_pins;
-
-typedef struct dc_motor_pwm_configuration_s {
-
-    uint8_t dc_slice_one;
-    uint8_t dc_chan_one;
-    uint16_t dc_wrap_one;
-    uint16_t dc_one_level;
-
-    uint8_t dc_slice_two;
-    uint8_t dc_chan_two;
-    uint16_t dc_wrap_two;
-    uint16_t dc_two_level;
-
-}dc_pwm;
-
-typedef struct dc_motor_configuration_s {
-
-    dc_pins my_dc_pins;
-    dc_pwm my_dc_pwm;
-
-}dc_motor;
-
-
-void set_new_configuration(dc_motor *dc, uint8_t motor_num, bool direction);
-uint16_t set_drive_power(dc_motor *dc, uint16_t rotary_in, uint16_t *duty_tbl);
-uint16_t set_drive_wrap(dc_motor *dc, uint16_t analog_in, uint16_t *wrap_tbl_chk, uint16_t *wrap_tbl);
-void set_motor_values(dc_motor *DC, uint16_t an_in, uint16_t ro_in);
+void set_new_configuration(c1_vars *c1, dc_motor *dcs);
+uint16_t set_drive_power(pre_calcs *pres, uint16_t rotary_in, uint16_t *duty_tbl);
+uint16_t set_drive_wrap(uint16_t analog_in, uint16_t *wrap_tbl_chk, uint16_t *wrap_tbl);
 dc_motor initialise_dc_pwm_pins(dc_motor *dc);
 bool check_analog_direction(uint16_t analog_in);
 
 
-//  Only handles a single motor ATM.  Adding a second is just a conditional.
-void set_new_configuration(dc_motor *dc, uint8_t motor_num, bool direction){
+void populate_wrappen(){
 
-    printf("\t////\tSetting New DC PWM Configuration\t////\n");
+  for(uint8_t i = 0; i < 9; i++){
 
- if(motor_num == 1){
-
-  if(direction){
-      //  Set direction Forward_Drive values.   
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_one, dc->my_dc_pwm.dc_wrap_one);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_one, dc->my_dc_pwm.dc_chan_one, dc->my_dc_pwm.dc_one_level);
-      sleep_us(2);
-      //  Set direction Reverse_Drive to zeros.
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_two, 0);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_two, dc->my_dc_pwm.dc_chan_two, 0);
-
-  }else {
-      //  Set direction Reverse_Drive values.
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_two, dc->my_dc_pwm.dc_wrap_two);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_two, dc->my_dc_pwm.dc_chan_two, dc->my_dc_pwm.dc_two_level);
-      sleep_us(2);
-      //  Set direction Forward_Drive values to zero.
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_one, 0);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_one, dc->my_dc_pwm.dc_chan_one, 0);
+    wrappen_duty[i] = ((five_K_inc_wrap[i]) * .09);
+      printf("Wrappen %i: %i.\n", i, wrappen_duty[i]);
 
   }
- }
- if(motor_num == 2){
-
-  if(direction){
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_one, dc->my_dc_pwm.dc_wrap_one);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_one, dc->my_dc_pwm.dc_chan_one, dc->my_dc_pwm.dc_one_level);
-  }else {
-    pwm_set_wrap(dc->my_dc_pwm.dc_slice_two, dc->my_dc_pwm.dc_wrap_two);
-    pwm_set_chan_level(dc->my_dc_pwm.dc_slice_two, dc->my_dc_pwm.dc_chan_two, dc->my_dc_pwm.dc_two_level);
-  }
- }
 
 }
 
 
-uint16_t set_drive_power(dc_motor *dc, uint16_t rotary_in, uint16_t *duty_tbl){
+void set_new_configuration(c1_vars *c1, dc_motor *dcs){
+
+    printf("\t////\tSetting New DC PWM Configuration\t////\n");
+
+  bool direction, idle;
+  direction = false;
+  idle = false;
+
+  idle = input_test(490, 525, c1->raw_adc_read);
+  printf("Raw ADC Received: %i.\n", c1->raw_adc_read);
+  printf("Motor is Idle: %c.\n", ((idle) ? 'Y' : 'N'));
+
+
+if(!idle){
+
+  direction = check_analog_direction(c1->raw_adc_read);
+  (direction) ? printf("Driving.\n") : printf("Reversing.\n");
+
+  if(direction){
+      //  Set direction Forward_Drive values.   
+    pwm_set_wrap(dcs->my_dc_pwm.dc_slice_one, c1->wrapping_input);
+    pwm_set_chan_level(dcs->my_dc_pwm.dc_slice_one, dcs->my_dc_pwm.dc_chan_one, c1->vertical_input);
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_one, true);
+        sleep_us(2);
+        //  Set direction Reverse_Drive to zeros.
+    pwm_set_wrap(dcs->my_dc_pwm.dc_slice_two, 0);
+    pwm_set_chan_level(dcs->my_dc_pwm.dc_slice_two, dcs->my_dc_pwm.dc_chan_two, 0);
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_two, false);
+
+  }else {
+      //  Set direction Reverse_Drive values.
+    pwm_set_wrap(dcs->my_dc_pwm.dc_slice_two, c1->wrapping_input);
+    pwm_set_chan_level(dcs->my_dc_pwm.dc_slice_two, dcs->my_dc_pwm.dc_chan_two, c1->vertical_input);
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_two, true);
+      sleep_us(2);
+        //  Set direction Forward_Drive values to zero.
+    pwm_set_wrap(dcs->my_dc_pwm.dc_slice_one, 0);
+    pwm_set_chan_level(dcs->my_dc_pwm.dc_slice_one, dcs->my_dc_pwm.dc_chan_one, 0);
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_one, false);
+
+  }
+}else {
+
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_one, false);
+  pwm_set_enabled(dcs->my_dc_pwm.dc_slice_two, false);
+//  printf("Motor's Idle.\n");
+
+}
+
+
+}
+
+
+uint16_t set_drive_power(pre_calcs *pres, uint16_t rotary_in, uint16_t *duty_tbl){
 
     uint16_t buffer_out;
     buffer_out = 0;
 
+  if(pres->wrap_val_buffered != 0){
+
     for(int i = 0; i <= 18; i += 2){
 
-        buffer_out = (input_Test(duty_tbl[i], duty_tbl[i+1], rotary_in)) ? (dc->my_dc_pwm.dc_wrap_one * ((i / 2) * .1)) : 0;
-        i = (buffer_out > 0) ? 17 : i;
+        buffer_out = (input_test(duty_tbl[i], duty_tbl[i+1], rotary_in)) ? wrappen_duty[(i/2)] : 0;
+        i = (buffer_out > 0) ? 18 : i;
         
     }
+  }
     printf("Drive Power Now: 0x%04x.\n", buffer_out);
-
 
     return buffer_out;
 }
 
 
-uint16_t set_drive_wrap(dc_motor *dc, uint16_t analog_in, uint16_t *wrap_tbl_chk, uint16_t *wrap_tbl){
+uint16_t set_drive_wrap(uint16_t analog_in, uint16_t *wrap_tbl_chk, uint16_t *wrap_tbl){
 
     uint16_t buffer_out;
     buffer_out = 0;
 
     for(int i = 0; i < 18; i += 2){
 
-        buffer_out = (input_Test(wrap_tbl_chk[i], wrap_tbl_chk[i+1], analog_in)) ? wrap_tbl[ (i / 2) ] : 0;
-        i = (buffer_out > 0) ? 17 : i;
+        buffer_out = (input_test(wrap_tbl_chk[i], wrap_tbl_chk[i+1], analog_in)) ? wrap_tbl[ (i / 2) ] : 0;
+        i = (buffer_out > 0) ? 18 : i;
         
     }
     printf("Drive Wrap Now: 0x%04X.\n", buffer_out);
@@ -176,13 +176,14 @@ uint16_t set_drive_wrap(dc_motor *dc, uint16_t analog_in, uint16_t *wrap_tbl_chk
 
 }
 
-
+/*
 void set_motor_values(dc_motor *DC, uint16_t an_in, uint16_t ro_in){
 
     printf("\n\t////\tSetting New Values For DC Motor\t////\n");
+  bool analog_idle;
   bool dir;
   dir = false;
-  analog_idle = input_Test(495, 525, an_in);
+  analog_idle = input_test(495, 525, an_in);
   
   printf("\n// // ///\tCurrent Analog Input: %i\t/// // //\n", an_in);
 
@@ -191,15 +192,15 @@ void set_motor_values(dc_motor *DC, uint16_t an_in, uint16_t ro_in){
 
   if(dir){
 
-    DC->my_dc_pwm.dc_wrap_one = set_drive_wrap(DC, an_in, analog_checks, five_K_inc_wrap);
+    DC->my_dc_pwm.dc_wrap_one = set_drive_wrap(an_in, analog_checks, five_K_inc_wrap);
     DC->my_dc_pwm.dc_one_level = set_drive_power(DC, ro_in, rotary_checks);
-      set_new_configuration(DC, 1, dir);
+      set_new_configuration(DC, dir);
     
   }else{
 
-    DC->my_dc_pwm.dc_wrap_two = set_drive_wrap(DC, an_in, analog_checks, five_K_inc_wrap);
+    DC->my_dc_pwm.dc_wrap_two = set_drive_wrap(an_in, analog_checks, five_K_inc_wrap);
     DC->my_dc_pwm.dc_two_level = set_drive_power(DC, ro_in, rotary_checks);
-      set_new_configuration(DC, 1, dir);
+      set_new_configuration(DC, dir);
       
     }
 
@@ -207,33 +208,35 @@ void set_motor_values(dc_motor *DC, uint16_t an_in, uint16_t ro_in){
 
     printf("Idle value's zeroed.\n");
 
-      pwm_set_chan_level(DC->my_dc_pwm.dc_slice_one, DC->my_dc_pwm.dc_chan_one, 0);
-      pwm_set_chan_level(DC->my_dc_pwm.dc_slice_two, DC->my_dc_pwm.dc_chan_two, 0);
+    pwm_set_chan_level(DC->my_dc_pwm.dc_slice_one, DC->my_dc_pwm.dc_chan_one, 0);
+    pwm_set_chan_level(DC->my_dc_pwm.dc_slice_two, DC->my_dc_pwm.dc_chan_two, 0);
+    pwm_set_enabled(DC->my_dc_pwm.dc_slice_two, false);
+    pwm_set_enabled(DC->my_dc_pwm.dc_slice_one, false);
+    
       
     printf("Analog Stick Idle.\n");
   }
 
 }
+*/
 
-bool check_analog_direction(uint16_t analog_in){
+bool check_analog_direction(uint16_t drive_input){
 
-  bool test_buffer_upper;
-  bool test_buffer_lower;
-  bool output_buffer;
-
-  test_buffer_upper = false;
-  test_buffer_lower = false;
-  output_buffer = false;
-
-  test_buffer_upper = (inputAbove(analog_in, 525)) ? true : false;
-  (test_buffer_upper) ? printf("Upper True\n") : printf("Upper False\n");
-  test_buffer_lower = (inputBelow(analog_in, 495)) ? true : false;
-  (test_buffer_lower) ? printf("Lower True\n") : printf("Lower False\n");
-
-    output_buffer = (test_buffer_upper && !test_buffer_lower) ? true : false;
-  (output_buffer) ? printf("Direction: Drive\n") : printf("Direction: Reverse\n");
+  bool a, b;
+  bool result;
   
-    return output_buffer;
+  a = false;
+  b = false;
+  result = false;
+
+  a = (inputAbove(drive_input, 550));
+    printf("Input Above 550: %c.\n", ((a) ? 'Y' : 'N'));
+  b = (inputBelow(drive_input, 470));
+    printf("Input Below 470: %c.\n", ((b) ? 'Y' : 'N'));
+  result = (a && !b);
+    printf("Direction Result: %c.\n", ((result) ? 'D' : 'R'));
+
+  return result;
 }
 
 //  Initialise PWM Pins for user selected GPIO pins.  DC_MOTORS

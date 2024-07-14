@@ -55,9 +55,10 @@ func_akk pico_to_clear_lcd(register_pins *pins);
 func_akk pico_to_lcd_line(register_pins *pins, char *data, ebit line_pos);
 func_akk pico_lcd_initialise(register_pins *pins);
 func_akk pico_to_write_screen(register_pins *pins, char *l_one, char *l_two, char *l_three, char *l_four);
-func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three, uint8_t colors);
+func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three);
 void pico_to_return_lcd_home(register_pins *pins);
 func_akk pico_to_fill_screen_with_char(register_pins *pins, ebit special_filler);
+func_akk pico_to_write_default(register_pins *pins, lcd_lines *lines);
 void rs_low(uint8_t pin);
 void rs_high(uint8_t pin);
 void e_pulse(void);
@@ -210,13 +211,11 @@ void register_nibble(register_pins *pins, ebit input_data)
       {
           gpio_put(pins->register_clk_line, 1);
 
-          gpio_put(pins->register_one_data, (((input_data >> i) & 0x01)));
-        //  (i != 7) ? printf("%i", ((input_data >> i) & 0x01)) : printf("%i\n", ((input_data >> i) & 0x01));
-          
+          gpio_put(pins->register_one_data, (((input_data >> i) & 0x01)));        
               sleep_us(5);
-            gpio_put(pins->register_clk_line, 0);
-            
-          sleep_us(10);
+          
+          gpio_put(pins->register_clk_line, 0);
+              sleep_us(2);
       }
         latch_register(pins, false);
         clock_pulse(pins);
@@ -238,18 +237,18 @@ void register_byte(register_pins *pins, ebit data_byte)
 //  printf("////  MSB: 0x%02x ////\n////  LSB: 0x%02x ////\n", MSB, LSB);
 
     gpio_put(lcd_e_pin, 0);
-      sleep_us(10);
+      sleep_ms(1);
     register_nibble(pins, (MSB & 0x0F));
-      sleep_us(10);
+      sleep_us(2);
     gpio_put(lcd_e_pin, 1);
-      sleep_us(10);
+      sleep_us(2);
 
     gpio_put(lcd_e_pin, 0);
-      sleep_us(10);
+      sleep_ms(1);
     register_nibble(pins, (LSB & 0x0F));
-      sleep_us(10);
+      sleep_us(2);
     gpio_put(lcd_e_pin, 1);
-       sleep_us(5);
+       sleep_us(2);
 
 }
 
@@ -259,7 +258,7 @@ func_akk pico_com_to_lcd(register_pins *pins, ebit command)
 
 //  printf("mcu->lcd: com\n");
   rs_low(lcd_rs_pin);
-    sleep_us(50);
+    sleep_us(100);
   register_byte(pins, command);
 
   return device_command_success;
@@ -271,7 +270,7 @@ func_akk pico_char_to_lcd(register_pins *pins, ebit character)
   
  // printf("mcu->lcd: char\n");
   rs_high(lcd_rs_pin);
-    sleep_us(50);
+    sleep_us(100);
 //    printf("Char: %c.\n", character);
   register_byte(pins, character);
 
@@ -285,7 +284,7 @@ void pico_char_line_to_lcd(register_pins *pins, char *in){
     sleep_us(50);
   
   rs_high(lcd_rs_pin);
-    sleep_us(50);
+    sleep_us(100);
   for(int i = 0; i < 20; i++){
 
     register_byte(pins, in[i]);
@@ -438,28 +437,42 @@ func_akk pico_to_write_screen(register_pins *pins, char *l_one, char *l_two, cha
 }
 
 
-func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three, uint8_t colors)
+func_akk pico_to_default_screen(register_pins *pins, lcd_lines *line, uint16_t in_one, uint16_t in_two, uint16_t in_three)
 {
+
   uint8_t status;
   status = 0;
 
   sprintf(line->line_one, "__RC Cont: Active__");
   status += 1;
-  sprintf(line->line_two, "Ver: %i Hor: %i", in_one, in_two);
+  sprintf(line->line_two, "Drive: %i  ", in_one);
   status += 1;
-  sprintf(line->line_three, "VRoom Amount: %04x", in_three);
+  sprintf(line->line_three, "Turn: %i", in_two);
   status += 1;
-  sprintf(line->line_four, "FL: %02x RL: %02x ", (colors & 0xF0), (colors & 0x0F));
+  sprintf(line->line_four, "VRoom Amount: %04x", in_three);
   status += 1;
 //  printf("Status: %i.\n", status);
+
+  return (status == 4) ? device_data_success : err;
+}
+
+
+func_akk pico_to_write_default(register_pins *pins, lcd_lines *line){
+    uint8_t status;
+  status = 0;
 
     pico_to_return_lcd_home(pins);
       sleep_us(50);
 
   //  pico_to_clear_lcd(pins);
-  status += pico_to_write_screen(pins, line->line_one, line->line_two, line->line_three, line->line_four);
+  for(uint8_t i = 0; i < 20; i++){
+    printf("%c", line->line_two[i]);
+  }
+  printf("\n");
+  status = pico_to_write_screen(pins, line->line_one, line->line_two, line->line_three, line->line_four);
 
-  return (status == 8) ? device_data_success : err;
+  return (status == 4) ? device_data_success : err;
+
 }
 
 

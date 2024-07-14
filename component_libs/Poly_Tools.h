@@ -1,7 +1,10 @@
 #ifndef POLY_TOOL_S_H
 #define POLY_TOOL_S_H
 
-
+#define has_value(a, b, c) ((bool) ((a > 0) | (b > 0) | (c > 0)) )
+#define upp_byte(a) ((uint8_t) ((a & 0xFF) << 8))
+#define low_byte(a) ((uint8_t) ((a & 0xFF)) )
+#define valid_data(a,b) ((bool) ((a != 0) && (b != 0)) )
 
 /*
     COMMENT OUT ANY TOOL NOT BEING USED.  (caution: may be good chance to look for dependency errors.)
@@ -12,11 +15,15 @@
 // #define BEER_TOOL
 #define PERI_TOOL
 // #define PICO_COMS
-#define RAND_TOOL
-// #define SCREEN_TOOL
-#define NRF_TOOL
+// #define RAND_TOOL
+#define SCREEN_TOOL
+// #define NRF_TOOL
 
 #include <stdio.h>
+
+#include "hi_lvl_resources/project_struct_s.h"
+#include "hi_lvl_resources/struct_definition_s.h"
+#include "hardware/spi.h"
 
 
 //  These headers are for the beer rater program project.
@@ -39,16 +46,14 @@
 
 // #include "Periphereals/interrupt_handler.h"
 // #include "Periphereals/interrupt_handler/interrupt_main_handler.h"
-// #include "Periphereals/interrupt_handler/interrupt_structs.h"
 // #include "Periphereals/resources/pico_adc_input.h"
 #include "Periphereals/resources/pico_pin_enum.h"
 // #include "Periphereals/resources/rand_funcs.h"
 // #include "Periphereals/shift_registers.h"
 // #include "Periphereals/sn74hc595.h"
 // #include "Periphereals/ultra_sonic_sensor.h"
-// #include "Periphereals/resources/Rc_RGB_Combinations.h"
-#include "Periphereals/Motors/dc_motors.h"
-#include "Periphereals/Motors/servo_motors.h"
+// #include "Periphereals/Motors/dc_motors.h"
+// #include "Periphereals/Motors/servo_motors.h"
 // #include "Periphereals/Motors/stepper_motors.h"
 
 
@@ -72,9 +77,9 @@
 
 #ifdef SCREEN_TOOL
 
-#define _2004A
+// #define _2004A
 // #define _1602A
-// #define _ILI9488
+#define _ILI9488
 // #define _SSD1306
 
 #ifdef _2004A
@@ -94,13 +99,18 @@
 
 #ifdef _ILI9488
 
-#include "/Screens/ILI9488_Screen/ili9488_error_management.h"
-#include "/Screens/ILI9488_Screen/ili9488_pin_management.h"
-#include "/Screens/ILI9488_Screen/ili9488_power_control.h"
-#include "/Screens/ILI9488_Screen/ili9488_screen_commands.h"
-#include "/Screens/ILI9488_Screen/ILI9488_4_WIRE_PRO.h"
-#include "/Screens/ILI9488_Screen/ILI9488_4_WIRE_PRO_V2.h"
-#include "/Screens/ILI9488_Screen/spi_management.h"
+//#include "Screen_lib/ILI9488_Screen/ILI9488_4_WIRE_PRO.h"
+// #include "Screen_lib/ILI9488_Screen/ILI9488_4_WIRE_PRO_v2.h"
+#include "Screen_lib/ILI9488_Screen/ili_user_config.h"
+#include "Screen_lib/ILI9488_Screen/resources/ili9488_error_management.h"
+// #include "Screen_lib/ILI9488_Screen/resources/ili9488_pin_management.h"
+#include "Screen_lib/ILI9488_Screen/resources/ili9488_power_control.h"
+#include "Screen_lib/ILI9488_Screen/resources/ili9488_screen_commands.h"
+// #include "Screen_lib/ILI9488_Screen/resources/spi_management.h"
+#include "Screen_lib/ILI9488_Screen/includes/ili9488_char_set.h"
+#include "Screen_lib/ILI9488_Screen/includes/ili9488_struct_s.h"
+#include "Screen_lib/ILI9488_Screen/includes/ili9488_function_s.h"
+#include "Screen_lib/ILI9488_Screen/includes/ili9488_function_proto_s.h"
 
 #endif
 

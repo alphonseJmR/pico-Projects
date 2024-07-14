@@ -3,11 +3,15 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include "interrupt_structs.h"
+#include "../../hi_lvl_resources/project_struct_s.h"
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
+#include "pico/time.h"
 #include "Periphereals/resources/pico_pin_enum.h"
 
+
+bool initialize_repeating_timer(int64_t delay, repeating_timer_callback_t callback, repeating_timer_t *out);
+void set_readied_values(payload_data *load, nrf_status *cons, pre_calcs *pres, pay_size *load_s);
 uint8_t interruption_input_initialisation(input_types *ins);
 void button_interrupt_handler(input_types *butts, uint gpio);
 bool buttons_timer(input_types *my_ren);
@@ -17,37 +21,36 @@ void main_interrupt_handler(uint gpio, uint32_t events);
 uint16_t button_incrementer(input_types *butts);
 
 
-input_types my_types = {
-
-  .r_en = {
-    .CLK = UNDEFINED,
-    .DT = UNDEFINED,
-    .REB = UNDEFINED,
-    .max_rota_val = 500,
-    .r_en_max = 2000
-    },
-
-  .t_buttons = {
-    .b_zero = GPIO_NINETEEN,
-    .b_one = GPIO_TWENTY
-    
-  },
-
-  .button_value = 0
-
-};
+repeating_timer_t my_timer;
+repeating_timer_t motor_timer;
 
 bool timed_result;
+
+
+//  If false return, no timer added.
+bool initialize_repeating_timer(int64_t delay, repeating_timer_callback_t callback, repeating_timer_t *out){
+
+    bool t_status;
+
+    t_status = add_repeating_timer_ms(delay, callback, NULL, out);
+
+    return t_status;
+}
 
 void main_interrupt_handler(uint gpio, uint32_t events){
 
     printf("\n////\tMain Interrupt Handler\t////\n");
         gpio_acknowledge_irq(gpio, events);
+  if(my_types.r_en.CLK == UNDEFINED || my_types.r_en.DT == UNDEFINED){
+
     if(gpio == my_types.r_en.CLK || gpio == my_types.r_en.DT){
+
         rotary_encoder_handler(&my_types, gpio, events);
-    }else{
-        button_interrupt_handler(&my_types, gpio);
+
     }
+  }else {
+    button_interrupt_handler(&my_types, gpio);
+  }
 }
 
 void rotary_encoder_handler(input_types *ren, uint gpio, uint32_t events){
@@ -268,8 +271,6 @@ uint16_t button_incrementer(input_types *butts){
     int buffer;
     buffer = 0;
         
-
-
     if(butts->t_buttons.b_ze_status){
         if(butts->button_value <= 475){
             printf("Incrementing by 25.\n");
@@ -296,4 +297,97 @@ uint16_t button_incrementer(input_types *butts){
     
     return buffer;
 }
+
+pay_size payload_size_check(pay_size *pays, payload_data *load){
+
+  if(valid_data(load->ready_load.load_duty_data.upper_duty, load->ready_load.load_duty_data.lower_duty)){
+    pays->zero_size = ( sizeof(load->ready_load.load_duty_data) );
+  }else {
+    pays->zero_size = 0;
+  }
+
+  if(valid_data(load->ready_load.load_vert_data.vert_upper, load->ready_load.load_vert_data.vert_lower)){
+    pays->one_size  = ( sizeof(load->ready_load.load_vert_data) );
+  }else {
+    pays->one_size = 0;
+  }
+
+  if(valid_data(load->ready_load.load_hori_data.hori_upper, load->ready_load.load_hori_data.hori_lower)){
+    pays->two_size  = ( sizeof(load->ready_load.load_hori_data) );
+  }else {
+    pays->two_size = 0;
+  }
+  
+  if(valid_data(load->ready_load.raw_data.raw_upper, load->ready_load.raw_data.raw_lower)){
+    pays->three_size = ( sizeof(load->ready_load.raw_data) );
+  }
+
+return *pays;
+}
+
+pre_calcs reconstitue_recieved(pre_calcs *pres, payload_data *loads, pay_size *iff){
+
+  if(iff->zero_size > 0){
+
+    pres->wrap_val_buffered = ( (loads->ready_load.load_duty_data.upper_duty << 8) | loads->ready_load.load_duty_data.lower_duty );
+
+  }else {
+    printf("No Data One Load Zero.\n");
+    pres->wrap_val_buffered = 0;
+  }
+
+  if(iff->one_size > 0){
+
+    pres->duty_cycle_buffed = ( (loads->ready_load.load_vert_data.vert_upper << 8) | loads->ready_load.load_vert_data.vert_lower );
+
+  }else {
+    printf("No Data One Load One.\n");
+    pres->duty_cycle_buffed = 0;
+  }
+
+  if(iff->two_size > 0){
+
+    pres->servo_val_buffed = ( (loads->ready_load.load_hori_data.hori_upper << 8) | loads->ready_load.load_hori_data.hori_lower );
+
+  }else {
+    printf("No Data One Load Two.\n");
+    pres->servo_val_buffed = 1460;
+  }
+
+  if(iff->three_size > 0){
+
+    pres->raw_adc_rec = ( (loads->ready_load.raw_data.raw_upper << 8) | loads->ready_load.raw_data.raw_lower);
+
+  }
+  else {
+    printf("No Data One Load Three.\n");
+    pres->raw_adc_rec = 0x01F7;
+  }
+
+  printf("Reconed Wrap: %i.\n", pres->wrap_val_buffered);
+  printf("Reconed Duty: %i.\n", pres->duty_cycle_buffed);
+  printf("Reconed Servo: %i.\n", pres->servo_val_buffed);
+  printf("Reconed Raw ADC: %i.\n", pres->raw_adc_rec);
+
+  return *pres;
+
+}
+
+void set_readied_values(payload_data *load, nrf_status *cons, pre_calcs *pres, pay_size *load_s){
+
+    *load_s = payload_size_check(load_s, load);
+
+        printf("\n\t//// ////\tNRF Received Input Sizes\t//// ////\n");
+        printf("//\tLoad Zero: %i.\n", load_s->zero_size);
+        printf("//\tLoad One: %i.\n", load_s->one_size);
+        printf("//\tLoad Two: %i.\n", load_s->two_size);
+        printf("//\tLoad Three: %i.\n\n", load_s->three_size);
+
+    *pres = reconstitue_recieved(pres, load, load_s);
+    
+    printf("\nVertical Data: 0x%04x.", pres->duty_cycle_buffed);
+    printf("\nHorizontal Data: 0x%04x.\n", pres->servo_val_buffed);
+
+}
+
 #endif

@@ -7,35 +7,80 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
+#include "hardware/dma.h"
+#include "../../rand_lib/rc_nrf_configs.h"
 
-typedef struct {
-  uint adc0_pin;
-  uint adc1_pin;
-  uint adc2_pin;
-  uint16_t adc0_raw_read;
-  uint16_t adc1_raw_read;
-  uint16_t adc2_raw_read;
-  uint16_t adc0_min_in_map_value;
-  uint16_t adc0_max_in_map_value;
-  uint16_t adc1_min_in_map_value;
-  uint16_t adc1_max_in_map_value;
-  uint16_t adc2_min_in_map_value;
-  uint16_t adc2_max_in_map_value;
-  uint16_t adc0_min_out_map_value;
-  uint16_t adc0_max_out_map_value;
-  uint16_t adc1_min_out_map_value;
-  uint16_t adc1_max_out_map_value;
-  uint16_t adc2_min_out_map_value;
-  uint16_t adc2_max_out_map_value;
-  uint16_t adc0_mapped_value;
-  uint16_t adc1_mapped_value;
-  uint16_t adc2_mapped_value;
-  float adc0_mapped_float;
-  float adc1_mapped_float;
-  float adc2_mapped_float;
+#define adc_Clk 48000000
+#define Adc_Freq 10000
 
-} adc_port_values;
-adc_port_values pico_adc;
+/*
+
+void dma_setup(adc_dma *my_dmas, input_types *types, payload_data *data){
+
+  types->dma_type_chan = dma_claim_unused_channel(true);
+  my_dmas->adc1_chan = dma_claim_unused_channel(true);
+  my_dmas->adc2_chan = dma_claim_unused_channel(true);
+
+  volatile void *load_ptr = &data->ready_load.load_zero;
+  volatile void *read_ptr = &types->button_value;
+
+  dma_channel_config c1 = dma_channel_get_default_config(types->dma_type_chan);
+  dma_channel_config c2 = dma_channel_get_default_config(my_dmas->adc1_chan);
+  dma_channel_config c3 = dma_channel_get_default_config(my_dmas->adc2_chan);
+
+  channel_config_set_transfer_data_size(&c1, DMA_SIZE_8);
+  channel_config_set_read_increment(&c1, false);
+  channel_config_set_write_increment(&c1, true);
+  channel_config_set_dreq(&c1, 0x3b);
+  dma_channel_configure(types->dma_type_chan, &c1,
+   load_ptr,
+   read_ptr,
+   1,
+   false);
+
+  channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);
+  channel_config_set_read_increment(&c2, false);
+  channel_config_set_write_increment(&c2, true);
+  channel_config_set_dreq(&c2, DREQ_ADC);
+  dma_channel_configure(my_dmas->adc1_chan, &c2, &my_dmas->adc1_dma_stored, &adc_hw->fifo, 1, false);
+  channel_config_set_chain_to(&c2, my_dmas->adc0_chan);
+
+  channel_config_set_transfer_data_size(&c3, DMA_SIZE_16);
+  channel_config_set_read_increment(&c3, false);
+  channel_config_set_write_increment(&c3, true);
+  channel_config_set_dreq(&c3, DREQ_ADC);
+  dma_channel_configure(my_dmas->adc2_chan, &c3, &my_dmas->adc2_dma_stored, &adc_hw->fifo, 1, false);
+  channel_config_set_chain_to(&c3, my_dmas->adc2_chan);
+}
+
+//  rnd_rbin is a bit mask of 0 - 0x1f for adc ports.  port 0 - 0x01, port1 0x02, port2 0x04.. etc
+//  adc_clk set to 48 Mhz (48000000)
+void setup_adc_free_run(adc_port_values *adc, uint64_t adc_clk, uint64_t freq, uint8_t rnd_rbin){
+
+    if(adc->adc0_pin != UNDEFINED){
+  adc_gpio_init(adc->adc0_pin);
+    }
+    if(adc->adc1_pin != UNDEFINED){
+  adc_gpio_init(adc->adc1_pin);
+    }
+    if(adc->adc2_pin != UNDEFINED){
+  adc_gpio_init(adc->adc2_pin);
+    }
+
+  adc_init();
+
+  adc_set_clkdiv((adc_clk/freq));
+
+  adc_select_input(0);
+
+  adc_set_round_robin(rnd_rbin);
+
+  adc_fifo_setup(true, true, 1, false, true);
+
+  adc_run(true);
+
+}
+*/
 
 
 // ===== Functions Below ========

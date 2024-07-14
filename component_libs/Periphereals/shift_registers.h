@@ -7,31 +7,6 @@
 #include "resources/pico_pin_enum.h"
 #include "hardware/gpio.h"
 
-typedef struct {
- const uint8_t register_one_data;
- const uint8_t register_one_latch;
- const uint8_t register_one_enable;
- const uint8_t register_two_data;
- const uint8_t register_two_latch;
- const uint8_t register_two_enable;
- const uint8_t register_clk_line;
-} register_pins;
-register_pins reg_pins;
-
-typedef struct {
-  uint8_t register_value_zero;
-  uint8_t register_value_one;
-  uint8_t register_value_two;
-  uint8_t register_value_three;
-  uint8_t register_value_four;
-  uint8_t register_value_five;
-  uint8_t register_value_six;
-  uint8_t register_value_seven;
-} uint8_variables;
-uint8_variables u_vars;
-
-
-
 void shift_register_pin_init(register_pins *config){
 
   printf("\n\t\tCD74HC595E Pin Initialization.\n\n");

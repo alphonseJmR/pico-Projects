@@ -8,21 +8,6 @@
 #include "resources/pico_pin_enum.h"
 
 
-typedef struct register_595_pin_s {
-
-    const uint8_t DATA_LINE_ONE;
-    const uint8_t LATCH_LINE_ONE;
-    const uint8_t ENABLE_LINE_ONE;
-
-    const uint8_t DATA_LINE_TWO;
-    const uint8_t LATCH_LINE_TWO;
-    const uint8_t ENABLE_LINE_TWO;
-
-    const uint8_t REGISTERS_CLK_LINE;
-
-} registered_pins;
-
-
 //  Return of 0x02 implies success, 0x01 implies error.
 uint8_t register_pin_initialisation(registered_pins *pins){
     printf("\n\n////\tCD74HC595 Pin Initialisation Begins.////\n\n");

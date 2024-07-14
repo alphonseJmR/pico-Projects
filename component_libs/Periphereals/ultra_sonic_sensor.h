@@ -2,27 +2,12 @@
 #define ULTRA_SONIC_SENSOR_S_H
 
 #include <stdio.h>
-#include "pico_pin_enum.h"
+#include "resources/pico_pin_enum.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
 
-typedef struct {
-  uint trigger_one;
-  uint echo_one;
-  uint echo_two;
-  uint32_t usonic_one_start;
-  uint32_t usonic_two_start;
-  uint32_t usonic_one_end;
-  uint32_t usonic_two_end;
-  uint32_t pulse_duration_one;
-  uint32_t pulse_duration_two;
-  double distance_one;
-  double distance_two;
-  uint16_t returned_distance_one;
-  uint16_t returned_distance_two;
 
-}ultra_sonic_data_t;
 ultra_sonic_data_t usonic;
 
 void ultra_sonic_sensor_pin_setup(ultra_sonic_data_t *pins) {

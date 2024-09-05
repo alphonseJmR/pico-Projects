@@ -66,22 +66,6 @@ static func_ack pin_validate(spi_pins *pins) {
   return status;
 }
 
-void quick_init_pins(spi_pins *pin){
-
-  gpio_init(pin->mosi);
-  gpio_init(pin->sck);
-  gpio_init(pin->csn);
-  gpio_init(pin->dc_rs);
-  gpio_init(pin->reset);
-
-  gpio_set_dir(pin->mosi, GPIO_OUT);
-  gpio_set_dir(pin->sck, GPIO_OUT);
-  gpio_set_dir(pin->csn, GPIO_OUT);
-  gpio_set_dir(pin->dc_rs, GPIO_OUT);
-  gpio_set_dir(pin->reset, GPIO_OUT);
-
-}
-
 
 spi_packet_s configure_instance(spi_packet_s *instance, spi_pins *pins){
 
@@ -247,22 +231,17 @@ void reset_put_low(bit rs){
 //  Up-to-date 7/14 00:32
 void reset_pulse(bit rs){
   reset_put_high(rs);
-    sleep_us(150);
+    sleep_ms(150);
   reset_put_low(rs);
     sleep_ms(150);
   reset_put_high(rs);
-    
+
 }
 
 //  Up-to-date 7/14 00:31
 void com_start(spi_pins *pins){
     printf("Putting DCRS && CSN low.\n");
   dcrs_put_low(pins->dc_rs);
-    sleep_us(5);
-}
-
-void com_end(spi_pins *pins){
-  dcrs_put_high(pins->dc_rs);
     sleep_us(5);
 }
 
@@ -660,27 +639,28 @@ func_ack ili_set_init_window(ili9488_window_var_s *window, spi_packet_s *pack){
       printf("Row_s: %i.\n", row_s);
     row_e = (window->dw_Height + (window->dw_Y - 1));
       printf("Row_e: %i.\n", row_e);
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     dcrs_put_low(my_pins.dc_rs);
       printf("Sending Command: Column Address Start/End.\n");
-      status += internal_write_function(&my_init, Sleep_IN, true);
-      status += internal_write_function(&my_init, Column_Address_Set, true);
+      status += internal_write_function(&my_init, Sleep_IN);
+      status += internal_write_function(&my_init, Column_Address_Set);
     dcrs_put_high(my_pins.dc_rs);
-      status += internal_write_function(&my_init, col_s, false);
-      status += internal_write_function(&my_init, col_e, false);
+      status += internal_write_function(&my_init, col_s);
+      status += internal_write_function(&my_init, col_e);
     dcrs_put_low(my_pins.dc_rs); 
-      status += internal_write_function(&my_init, NOP, true);
+      status += internal_write_function(&my_init, NOP);
     printf("Sending Command: Page Address Start.\n");
-      status += internal_write_function(&my_init, Sleep_OUT, true);
-      status += internal_write_function(&my_init, Page_Address_Set, true);
+      status += internal_write_function(&my_init, Sleep_OUT);
+      status += internal_write_function(&my_init, Page_Address_Set);
     dcrs_put_high(my_pins.dc_rs);
-      status += internal_write_function(&my_init, row_s, false);
-      status += internal_write_function(&my_init, row_e, false);
+      status += internal_write_function(&my_init, row_s);
+      status += internal_write_function(&my_init, row_e);
     dcrs_put_low(my_pins.dc_rs);
-      status += internal_write_function(&my_init, NOP, true);
+      status += internal_write_function(&my_init, NOP);
       printf("NOP Sent.\n");
-      status += internal_write_function(&my_init, Sleep_IN, true);
-    csn_put_high(my_pins.csn);
+      status += internal_write_function(&my_init, Sleep_IN);
+
+    csn_put_low(my_pins.csn);
     return (status == 10) ? ili_ack : func_error;
 }
 
@@ -704,25 +684,26 @@ func_ack ili_set_user_window(spi_packet_s *pack, sbit xs, sbit xe, sbit ys, sbit
       printf("Row_s: %i.\n", row_s);
     row_e = ye;
       printf("Row_e: %i.\n", row_e);
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
       printf("Sending Command: Column Address Start/End.\n");
       //  internal_write_function returns 4 if no errors are asserted.
-      status += internal_write_function(&my_init, Column_Address_Set, true);
+      status += internal_write_function(&my_init, Column_Address_Set);
     data_start(&my_pins);
-      status += internal_write_function(&my_init, col_s, false);
-      status += internal_write_function(&my_init, col_e, false);
+      status += internal_write_function(&my_init, col_s);
+      status += internal_write_function(&my_init, col_e);
     com_start(&my_pins);
       printf("Sending Command: Page Address Start.\n");
-      status += internal_write_function(&my_init, Page_Address_Set, true);
+      status += internal_write_function(&my_init, Page_Address_Set);
     data_start(&my_pins);
-      status += internal_write_function(&my_init, row_s, false);
-      status += internal_write_function(&my_init, row_e, false);
+      status += internal_write_function(&my_init, row_s);
+      status += internal_write_function(&my_init, row_e);
     com_start(&my_pins);
-      status += internal_write_function(&my_init, NOP, true);
-      status += internal_write_function(&my_init, Sleep_IN, true);
+      status += internal_write_function(&my_init, NOP);
+      status += internal_write_function(&my_init, Sleep_IN);
       printf("Function Status Ended: %i.\n", status);
-    csn_put_high(my_pins.csn);
+    
+    csn_put_low(my_pins.csn);
     return (status == 36) ? spi_ack : func_error;
 }
 
@@ -770,18 +751,19 @@ func_ack ili_set_cursor_pos(spi_packet_s *pack, sbit x, sbit y){
     x_e = (x & 0xFF);
     y_s = ((y >> 8) & 0xFF);
     y_e = (y & 0xFF);
-    csn_put_low(my_pins.csn);
-    com_start(&my_pins);
-      status += internal_write_function(&my_init, Column_Address_Set, true);
-    data_start(&my_pins);
-      status += internal_write_function(&my_init, x_s, false);
-      status += internal_write_function(&my_init, x_e, false);
-    com_start(&my_pins);
-      status += internal_write_function(&my_init, Page_Address_Set, true);
-    data_start(&my_pins);
-      status += internal_write_function(&my_init, y_s, false);
-      status += internal_write_function(&my_init, y_e, false);
     csn_put_high(my_pins.csn);
+    com_start(&my_pins);
+      status += internal_write_function(&my_init, Column_Address_Set);
+    data_start(&my_pins);
+      status += internal_write_function(&my_init, x_s);
+      status += internal_write_function(&my_init, x_e);
+    com_start(&my_pins);
+      status += internal_write_function(&my_init, Page_Address_Set);
+    data_start(&my_pins);
+      status += internal_write_function(&my_init, y_s);
+      status += internal_write_function(&my_init, y_e);
+
+    csn_put_low(my_pins.csn);
     return (status == 24) ? ili_ack : func_error;
 
 }
@@ -796,9 +778,9 @@ func_ack ili_fill(spi_packet_s *pack, ebit pixels[][3]){
   status, f_status = 0;
   r, g, b = 0;
     printf("Iterations: %i.\n", (max_iterations / 3));
-  csn_put_low(my_pins.csn);
+  csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status += internal_write_function(&my_init, Memory_Write, true);
+    status += internal_write_function(&my_init, Memory_Write);
       f_status += status;
     status = 0;
   data_start(&my_pins);
@@ -808,13 +790,13 @@ func_ack ili_fill(spi_packet_s *pack, ebit pixels[][3]){
     g = (pixels[i][1]);
     b = (pixels[i][2]);
 
-    status += internal_write_function(&my_init, r, false);
+    status += internal_write_function(&my_init, r);
       f_status += status;
       status = 0;
-    status += internal_write_function(&my_init, g, false);
+    status += internal_write_function(&my_init, g);
       f_status += status;
       status = 0;
-    status += internal_write_function(&my_init, b, false);
+    status += internal_write_function(&my_init, b);
       f_status += status;
       status = 0;
 
@@ -822,7 +804,8 @@ func_ack ili_fill(spi_packet_s *pack, ebit pixels[][3]){
       printf("\n\nCurrent Iteration: %i.\n\tOut Of: %i\n\n", i, (max_iterations / 3));
     }
   }
-  csn_put_high(my_pins.csn);
+
+  csn_put_low(my_pins.csn);
     return (f_status == 4) ? ili_ack : func_error;
 }
 
@@ -877,9 +860,9 @@ func_ack ili_draw_pixel(spi_packet_s *pack, tbit x, tbit y, tbit color){
     if((x >= ILI_LCD_WIDTH) || (y >= ILI_LCD_HEIGHT)){
         return func_error;
     }
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, Sleep_OUT, true);
+      status = internal_write_function(&my_init, Sleep_OUT);
       f_status += status;
       status = 0;
 
@@ -888,22 +871,23 @@ func_ack ili_draw_pixel(spi_packet_s *pack, tbit x, tbit y, tbit color){
       status = 0;
     csn_put_low(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, Memory_Write, true);
+      status = internal_write_function(&my_init, Memory_Write);
       f_status += status;
       status = 0;
     data_start(&my_pins);
-      status = internal_write_function(&my_init, r, false);
+      status = internal_write_function(&my_init, r);
       f_status += status;
       status = 0;
 
-      status = internal_write_function(&my_init, g, false);
+      status = internal_write_function(&my_init, g);
       f_status += status;
       status = 0;
 
-      status = internal_write_function(&my_init, b, false);
+      status = internal_write_function(&my_init, b);
       f_status += status;
       status = 0;
-    csn_put_high(my_pins.csn);
+    csn_put_low(my_pins.csn);
+    
     return ((f_status <= 6) || (f_status >= 9) ) ? ili_ack : func_error;
 
 }
@@ -1023,7 +1007,7 @@ func_ack ili_draw_string(spi_packet_s *pack, tbit x, tbit y, char *string_ptr, t
 
 
 func_ack ili_delay(uint32_t wait_value){
- // printf("\nIli Delay.\n");
+  printf("\nIli Delay.\n");
     tbit i;
   for(i = 0; i < wait_value; i++){
     for(i = 0; i < 100000; i++){
@@ -1039,7 +1023,7 @@ ebit spi_read_data(spi_packet_s *inst){
   ebit device;
     device = 0;
   ebit status;
-    status = internal_write_function(&my_init, Read_ID_FOUR, true);
+    status = internal_write_function(&my_init, Read_ID_FOUR);
   csn_put_low(my_pins.csn);
   dcrs_put_high(my_pins.dc_rs);
     spi_read_blocking(inst->instance, 0, (dev_id), 2);
@@ -1057,19 +1041,18 @@ func_ack ili_pos_gam_ctrl(spi_packet_s *pack, uint8_t com, const uint8_t *gam_da
   ebit status, f_status;
     status, f_status = 0;
   size_t arr_size = (sizeof(gam_data) / (sizeof(uint8_t)));
-  csn_put_low(my_pins.csn);
-      status = internal_write_function(&my_init, com, true);
-    com_end(&my_pins);
+  csn_put_high(my_pins.csn);
+  com_start(&my_pins);
+      status = internal_write_function(&my_init, com);
       f_status += status;
-  
   data_start(&my_pins);
   for(uint8_t i = 0; i < arr_size; i++){
         status = 0;
-      status = internal_write_function(&my_init, gam_data[i], false);
+      status = internal_write_function(&my_init, gam_data[i]);
         f_status += status;
-  //  dcrs_put_low(my_pins.dc_rs);
   }
-  csn_put_high(my_pins.csn);
+
+    csn_put_low(my_pins.csn);
   return (f_status > 8) ? ili_ack : func_error;
 }
 
@@ -1079,17 +1062,18 @@ func_ack ili_neg_gam_ctrl(spi_packet_s *pack,  uint8_t com, const uint8_t *data)
   ebit status, f_status;
   status, f_status = 0;
   size_t arr_s = ( sizeof(data) / sizeof(uint8_t));
-    csn_put_low(my_pins.csn);
+
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
   for(uint8_t i = 0; i < arr_s; i++){
       status = 0;
-      status = internal_write_function(&my_init, data[i], false);
+      status = internal_write_function(&my_init, data[i]);
       f_status += status;
   }
-  csn_put_high(my_pins.csn);
+    csn_put_low(my_pins.csn);
   return (f_status > 4) ? ili_ack : func_error;
 }
 
@@ -1098,16 +1082,17 @@ func_ack ili_pwr_ctrl_o(spi_packet_s *pack,  uint8_t com, const uint8_t *data){
     printf("Setting Power Control One.\n");
   ebit status, f_status;
   status, f_status = 0;
-    csn_put_low(my_pins.csn);
+
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
-      status = internal_write_function(&my_init, pwr_con_o[0], false);
+      status = internal_write_function(&my_init, pwr_con_o[0]);
       f_status += status;
-      status = internal_write_function(&my_init, pwr_con_o[1], false);
+      status = internal_write_function(&my_init, pwr_con_o[1]);
       f_status += status;
-    csn_put_high(my_pins.csn);
+    csn_put_low(my_pins.csn);
     return (f_status == 12) ? ili_ack : func_error;
 }
 
@@ -1117,14 +1102,15 @@ func_ack ili_pwr_ctrl_t(spi_packet_s *pack, uint8_t com, const uint8_t *data){
     printf("Setting Power Control Two.\n");
   ebit status, f_status;
   status, f_status = 0;
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
-      status = internal_write_function(&my_init, pwr_con_t[0], false);
+      status = internal_write_function(&my_init, pwr_con_t[0]);
       f_status += status;
-    csn_put_high(my_pins.csn);
+
+    csn_put_low(my_pins.csn);
     return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1135,16 +1121,17 @@ func_ack ili_vcom_ctrl(spi_packet_s *pack, uint8_t com, const uint8_t *data){
   ebit status, f_status;
       status, f_status = 0;
   size_t arr_size = ( sizeof(data) / sizeof(uint8_t));
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
   for(uint8_t i = 0; i < arr_size; i++){
-      status = internal_write_function(&my_init, data[i], false);
+      status = internal_write_function(&my_init, data[i]);
       f_status += status;
   }
-    csn_put_high(my_pins.csn);
+
+    csn_put_low(my_pins.csn);
     return (f_status > 8) ? ili_ack : func_error;
 }
 
@@ -1154,14 +1141,15 @@ func_ack ili_mem_acc_ctrl(spi_packet_s *pack, uint8_t com, uint8_t data){
       printf("Setting Memory Access Control.\n");
   ebit status, f_status;
   status, f_status = 0;
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
-      status = internal_write_function(&my_init, data, false);
+      status = internal_write_function(&my_init, data);
       f_status += status;
-    csn_put_high(my_pins.csn);
+    
+    csn_put_low(my_pins.csn);
     return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1171,14 +1159,15 @@ func_ack ili_pix_intr_format(spi_packet_s *pack, uint8_t com, uint8_t data){
     printf("Setting Pixel Interface Format.\n");
   ebit status, f_status;
   status, f_status = 0;
-    csn_put_low(my_pins.csn);
+    csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
     data_start(&my_pins);
-      status = internal_write_function(&my_init, data, false);
+      status = internal_write_function(&my_init, data);
       f_status += status;
-    csn_put_high(my_pins.csn);
+
+    csn_put_low(my_pins.csn);
     return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1188,14 +1177,15 @@ func_ack ili_intr_mode_ctrl(spi_packet_s *pack, uint8_t com, uint8_t data){
       printf("Setting Interface Mode Control.\n");
   ebit status, f_status;
     status, f_status = 0;
-  csn_put_low(my_pins.csn);
+  csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status = internal_write_function(&my_init, com, true);
+    status = internal_write_function(&my_init, com);
     f_status += status;
   data_start(&my_pins);
-    status = internal_write_function(&my_init, data, false);
+    status = internal_write_function(&my_init, data);
     f_status += status;
-  csn_put_high(my_pins.csn);
+
+  csn_put_low(my_pins.csn);
   return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1205,14 +1195,15 @@ func_ack ili_frame_rate_ctrl(spi_packet_s *pack, uint8_t com, uint8_t data){
       printf("Setting Frame Rate Control.\n");
   ebit status, f_status;
     status, f_status = 0;
-  csn_put_low(my_pins.csn);
+  csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status = internal_write_function(&my_init, com, true);
+    status = internal_write_function(&my_init, com);
     f_status += status;
   data_start(&my_pins);
-    status = internal_write_function(&my_init, data, false);
+    status = internal_write_function(&my_init, data);
     f_status += status;
-  csn_put_high(my_pins.csn);
+
+  csn_put_low(my_pins.csn);
   return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1222,14 +1213,15 @@ func_ack ili_dspy_inver(spi_packet_s *pack, uint8_t com, uint8_t data){
     printf("Setting Display Inversion.\n");
   ebit status, f_status;
     status, f_status = 0;
-  csn_put_low(my_pins.csn);
+  csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status = internal_write_function(&my_init, com, true);
+    status = internal_write_function(&my_init, com);
     f_status += status;
   data_start(&my_pins);
-    status = internal_write_function(&my_init, data, false);
+    status = internal_write_function(&my_init, data);
     f_status += status;
-  csn_put_high(my_pins.csn);
+
+  csn_put_low(my_pins.csn);
   return (f_status == 8) ? ili_ack : func_error;
 }
 
@@ -1240,17 +1232,18 @@ func_ack ili_dspy_func_ctrl(spi_packet_s *pack, uint8_t com, const uint8_t *data
   ebit status, f_status;
   size_t arr_size = (sizeof(data) / sizeof(uint8_t));
       status, f_status = 0;
-    csn_put_low(my_pins.csn);
+  csn_put_high(my_pins.csn);
     com_start(&my_pins);
-      status = internal_write_function(&my_init, com, true);
+      status = internal_write_function(&my_init, com);
       f_status += status;
   for(uint8_t i = 0; i < arr_size; i++){
     data_start(&my_pins);
     status = 0;
-    status = internal_write_function(&my_init, data[i], false);
+    status = internal_write_function(&my_init, data[i]);
     f_status += status;
   }
-  csn_put_high(my_pins.csn);
+
+  csn_put_low(my_pins.csn);
   return (f_status > 4) ? ili_ack : func_error;
 }
 
@@ -1260,13 +1253,14 @@ func_ack ili_s_out(spi_packet_s *pack, uint8_t com){
     printf("Setting Sleep OUT.\n");
   ebit status, f_status;
     status, f_status = 0;
-  csn_put_low(my_pins.csn);
+csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status = internal_write_function(&my_init, com, true);
+    status = internal_write_function(&my_init, com);
     f_status += status;
       sleep_ms(150);
   data_end(&my_pins);
-  csn_put_high(my_pins.csn);
+  
+    csn_put_low(my_pins.csn);
   return (f_status == 4) ? ili_ack : func_error;
 }
 
@@ -1276,10 +1270,11 @@ func_ack ili_dspy_on(spi_packet_s *pack, uint8_t com){
     printf("Setting Display On.\n");
   ebit status;
     status = 0;
-  csn_put_low(my_pins.csn);
+ csn_put_high(my_pins.csn);
   com_start(&my_pins);
-    status = internal_write_function(&my_init, com, true);
-  csn_put_high(my_pins.csn);
+    status = internal_write_function(&my_init, com);
+ 
+    csn_put_low(my_pins.csn);
   return (status == 4) ? ili_ack : func_error;
 }
 
@@ -1334,7 +1329,7 @@ func_ack ili_initialize(init_var_s *init, ili9488_funcs *ili){
     
 }
 
-/*
+
 func_ack internal_write_function(init_var_s *ili, uint8_t input){
 
   uint8_t status;
@@ -1353,56 +1348,6 @@ func_ack internal_write_function(init_var_s *ili, uint8_t input){
 
   return (status == 2) ? general_ack : func_error;
 
-}
-*/
-
-
-//  Bool bCbD = bit Command bit Data.  True = Command, false = data
-func_ack internal_write_function(init_var_s *ili, uint8_t input, bool bCbD){
-
-  uint8_t status;
-  uint8_t i;
-  uint8_t dcrs_bit_set;
-  uint8_t out_bit;
-  uint8_t clk_set;
-  clk_set = 0x00;
-  i = 0;
-  status = 0;
-
-    dcrs_bit_set = (8 - 1);
-
-    for(i; i < 8; i++){
-    //  printf("Data on %i: 0x%01x\n", i, out_bit);
-      out_bit = ((input >> i) & 0x01);
-    //  printf("Out_bit: 0x%01x\n", out_bit);
-
-      if(i != (dcrs_bit_set)){
-        gpio_put(ili->my_pins->sck, clk_set);
-        gpio_put(ili->my_pins->mosi, out_bit);
-          ili_delay(1);
-        gpio_put(ili->my_pins->sck, (clk_set ^ 0x01));
-        status += ((uint8_t)out_bit << i);
-
-      }else {
-        gpio_put(ili->my_pins->sck, clk_set);
-        gpio_put(ili->my_pins->dc_rs, !bCbD);
-          ili_delay(1);
-        gpio_put(ili->my_pins->mosi, out_bit);
-          ili_delay(1);
-        gpio_put(ili->my_pins->sck, (clk_set ^ 0x01));
-        status += ((uint8_t)out_bit << i);
-
-      }
-    }
-
-    printf("Input Value: 0x%02x.\n", input);
-    printf("Status Value: 0x%02x.\n", status);
-
-    if(status == input){
-      return ili_ack;
-    }else{
-      return func_error;
-    }
 }
 
 

@@ -27,8 +27,8 @@ input_types my_types = {
     },
 
   .t_buttons = {
-    .b_zero = GPIO_NINETEEN,
-    .b_one = GPIO_TWENTY
+    .b_zero = GPIO_SIXTEEN,
+    .b_one = GPIO_SEVENTEEN
     
   },
 
@@ -46,7 +46,7 @@ nrf_time my_timing = {
 
 servo_motor my_servo = {
 
-  .my_perv.servo_pin_one = GPIO_TEN,
+  .my_perv.servo_pin_one = GPIO_TWENTY,
   .my_perv.servo_pin_two = UNDEFINED,
 
   .my_serv.servo_wrap_one = 39062.f,
@@ -58,8 +58,8 @@ servo_motor my_servo = {
 
 dc_motor my_dc = {
 
-  .my_dc_pins.motor_one_forward = GPIO_TWELVE,
-  .my_dc_pins.motor_one_reverse = GPIO_THIRTEEN,
+  .my_dc_pins.motor_one_forward = GPIO_EIGHTEEN,
+  .my_dc_pins.motor_one_reverse = GPIO_NINETEEN,
 
   .my_dc_pins.motor_two_forward = UNDEFINED,
   .my_dc_pins.motor_two_reverse = UNDEFINED,
@@ -158,6 +158,31 @@ payload_data my_loads = {
 
 };
 
+payload_data turret_load = {
+
+  .ready_load.load_duty_data.upper_duty = 0,
+  .ready_load.load_duty_data.lower_duty = 0,
+  .ready_load.load_vert_data.vert_upper = 0,
+  .ready_load.load_vert_data.vert_lower = 0,
+  .ready_load.load_hori_data.hori_upper = 0,
+  .ready_load.load_hori_data.hori_lower = 0,
+  .ready_load.raw_data.raw_upper = 0,
+  .ready_load.raw_data.raw_lower = 0,
+  .ready_load.load_two = 0,
+  .ready_load.load_three = 0,
+
+  .payload_buffer.load_duty_buffer.duty_upper = 0,
+  .payload_buffer.load_duty_buffer.duty_lower = 0,
+  .payload_buffer.load_vert_buffer.vert_upper_buf = 0,
+  .payload_buffer.load_vert_buffer.vert_lower_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_upper_buf = 0,
+  .payload_buffer.load_hori_buffer.hori_lower_buf = 0,
+  .payload_buffer.raw_buf_data.raw_buf_upper = 0,
+  .payload_buffer.raw_buf_data.raw_buf_lower = 0,
+  .payload_buffer.load_two_buffer = 0,
+  .payload_buffer.load_three_buffer = 0
+
+};
 
 adc_port_values my_adc = {
     .adc0_pin = GPIO_TWENTY_SIX,
@@ -191,5 +216,53 @@ adc_port_values my_adc = {
 };
 
 
+adc_port_values turret_adc = {
+  .adc0_pin = UNDEFINED,
+  .adc1_pin = GPIO_TWENTY_SEVEN,
+  .adc2_pin = GPIO_TWENTY_EIGHT,
+  .adc0_raw_read = 0,
+  .adc1_raw_read = 0,
+  .adc2_raw_read = 0,
+  .adc0_min_in_map_value = 0,
+  .adc0_max_in_map_value = 0,
+  .adc1_min_in_map_value = 0,
+  .adc1_max_in_map_value = 4096,
+  .adc2_min_in_map_value = 0,
+  .adc2_max_in_map_value = 4096,
+  .adc0_min_out_map_value = 0,
+  .adc0_max_out_map_value = 0,
+  .adc1_min_out_map_value = 0,
+  .adc1_max_out_map_value = 255,
+  .adc2_min_out_map_value = 0,
+  .adc2_max_out_map_value = 255,
+  .adc0_mapped_value = 0,
+  .adc1_mapped_value = 0,
+  .adc2_mapped_value = 0,
+  
+};
+
+input_types turret_buttons = {
+
+  .t_buttons = {
+    .b_zero = GPIO_SIXTEEN,
+    .b_one = GPIO_SEVENTEEN
+  }
+
+};
+
+nrf_setup controller_init = {
+
+.nrf_setup_complete = false,
+.channel_complete = false,
+.data_rate_complete = false,
+.power_complete = false,
+.setting_val = 0,
+.top_line = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+.bottom_line = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+.channel_set = 0,
+.data_set = 0,
+.power_set = 0
+
+};
 
 #endif

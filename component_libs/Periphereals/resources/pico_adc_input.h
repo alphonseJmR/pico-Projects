@@ -10,6 +10,8 @@
 #include "hardware/dma.h"
 #include "../../rand_lib/rc_nrf_configs.h"
 
+#define map_between(a,b,c) (bool)( (a >= b) && (a <= c))
+
 #define adc_Clk 48000000
 #define Adc_Freq 10000
 
@@ -110,48 +112,46 @@ float map(long x, long in_min, long in_max, long out_min, long out_max) {
 
 //  Adc_pin_call function takes in a struct and based on the set values, can call all three ADC ports, and map their respective values.
 void adc_pin_call(adc_port_values *config) {
+  printf("ADC PIN CALL.\n");
   /*
     Select inputs according to ADC enabled pins.  Perform ADC call on inputs 0, 1, or 2. 
     Select which input to read data from (0 | 1 | 2).
+    Convert raw analog input data using MAP function.
+    Store in respectively named analog.(adcX)_mapped_value variable.
   */
   if(config->adc0_pin != UNDEFINED) {
     adc_select_input(0);
     config->adc0_raw_read = adc_read();
-    printf("\n\n\tRaw value of ADC0: %d.\n", config->adc0_raw_read);
+        printf("\n\n\tRaw value of ADC0: %d.\n", config->adc0_raw_read);
+    if(config->adc0_raw_read > 0){
+      config->adc0_mapped_value = map(config->adc0_raw_read, config->adc0_min_in_map_value, config->adc0_max_in_map_value, config->adc0_min_out_map_value, config->adc0_max_out_map_value);
+    //  config->adc0_mapped_float = (float)map((float)config->adc0_raw_read, (float)config->adc0_min_in_map_value, (float)config->adc0_max_in_map_value, (float)config->adc0_min_out_map_value, (float)config->adc0_max_out_map_value);
+    } else {
+        printf("\tADC0 Port Has No Value.\n");
+    }
     }
   if(config->adc1_pin != UNDEFINED) {
     adc_select_input(1);
     config->adc1_raw_read = adc_read();
-    printf("\t\tRaw value of ADC1: %d.\n", config->adc1_raw_read);
+        printf("\t\tRaw value of ADC1: %d.\n", config->adc1_raw_read);
+    if(config->adc1_raw_read > 0){
+      config->adc1_mapped_value = map(config->adc1_raw_read, config->adc1_min_in_map_value, config->adc1_max_in_map_value, config->adc1_min_out_map_value, config->adc1_max_out_map_value);
+    //  config->adc1_mapped_float = (float)map((float)config->adc1_raw_read, (float)config->adc1_min_in_map_value, (float)config->adc1_max_in_map_value, (float)config->adc1_min_out_map_value, (float)config->adc1_max_out_map_value);
+    } else {
+        printf("\tADC1 Port Has No Value.\n");
+    }
     }
   if(config->adc2_pin != UNDEFINED) {
     adc_select_input(2);
     config->adc2_raw_read = adc_read();
-    printf("\t\t\tRaw value of ADC2: %d.\n\n", config->adc2_raw_read);
-    }
-    
-    //  Convert raw analog input data of vertical & horizontal using MAP function.
-    //  Store in respectively named analog.()_raw_conversion variable.
-    if(config->adc0_raw_read > 0){
-    config->adc0_mapped_value = map(config->adc0_raw_read, config->adc0_min_in_map_value, config->adc0_max_in_map_value, config->adc0_min_out_map_value, config->adc0_max_out_map_value);
-      config->adc0_mapped_float = (float)map((float)config->adc0_raw_read, (float)config->adc0_min_in_map_value, (float)config->adc0_max_in_map_value, (float)config->adc0_min_out_map_value, (float)config->adc0_max_out_map_value);
-    } else {
-      printf("\tADC0 Port Has No Value.\n");
-    }
-    if(config->adc1_raw_read > 0){
-    config->adc1_mapped_value = map(config->adc1_raw_read, config->adc1_min_in_map_value, config->adc1_max_in_map_value, config->adc1_min_out_map_value, config->adc1_max_out_map_value);
-      config->adc1_mapped_float = (float)map((float)config->adc1_raw_read, (float)config->adc1_min_in_map_value, (float)config->adc1_max_in_map_value, (float)config->adc1_min_out_map_value, (float)config->adc1_max_out_map_value);
-    }  else {
-      printf("\tADC1 Port Has No Value.\n");
-    }
+        printf("\t\t\tRaw value of ADC2: %d.\n\n", config->adc2_raw_read);
     if(config->adc2_raw_read > 0){
-    config->adc2_mapped_value = map(config->adc2_raw_read, config->adc2_min_in_map_value, config->adc2_max_in_map_value, config->adc2_min_out_map_value, config->adc2_max_out_map_value);
-      config->adc2_mapped_float = (float)map((float)config->adc2_raw_read, (float)config->adc2_min_in_map_value, (float)config->adc2_max_in_map_value, (float)config->adc2_min_out_map_value, (float)config->adc2_max_out_map_value);
-    }  else {
-      printf("\tADC2 Port Has No Value.\n");
+      config->adc2_mapped_value = map(config->adc2_raw_read, config->adc2_min_in_map_value, config->adc2_max_in_map_value, config->adc2_min_out_map_value, config->adc2_max_out_map_value);
+    //  config->adc2_mapped_float = (float)map((float)config->adc2_raw_read, (float)config->adc2_min_in_map_value, (float)config->adc2_max_in_map_value, (float)config->adc2_min_out_map_value, (float)config->adc2_max_out_map_value);
+    } else {
+        printf("\tADC2 Port Has No Value.\n");
     }
-
-    
+    }
 };
 
 void adc_pin_setup(adc_port_values *config) {
@@ -184,6 +184,63 @@ void adc_pin_setup(adc_port_values *config) {
 
 }
 
+uint8_t stick_menu(adc_port_values *val, uint8_t prev_sel){
+    uint8_t selector_buf = prev_sel;
+      printf("Previous Menu Choice: %i.\n", prev_sel);
 
+  adc_pin_call(val);
+    printf("ADC1 Mapped Value: %i.\n", val->adc1_mapped_value);
+
+    if(map_between(val->adc1_mapped_value, 0, 105)){
+        printf("Menu UP.\n");
+      if(selector_buf > 0){
+        selector_buf--;
+      }else{
+        printf("Top Of Menu.\n");
+      }
+    }else if(map_between(val->adc1_mapped_value, 170, 254)){
+        printf("Menu UP.\n");
+      if(selector_buf < 4){
+        selector_buf++;
+      }else{
+        printf("Bottom Of Menu.\n");
+      }
+    }else{
+      printf("Menu Choice Ideling.\n");
+    }
+    printf("Current Menu Selection: %i.\n", selector_buf);
+  sleep_ms(5);
+
+  return selector_buf;
+}
+
+uint8_t analog_menu(adc_port_values *val, uint8_t menu_max){
+  uint8_t selector_buf = 0;
+
+  adc_pin_call(val);
+    printf("ADC1 Mapped Value: %i.\n", val->adc1_mapped_value);
+
+    if(map_between(val->adc1_mapped_value, 0, 105)){
+        printf("Menu UP.\n");
+      if(selector_buf > 0){
+        selector_buf--;
+      }else{
+        printf("Top Of Menu.\n");
+      }
+    }else if(map_between(val->adc1_mapped_value, 170, 254)){
+        printf("Menu UP.\n");
+      if(selector_buf < menu_max){
+        selector_buf++;
+      }else{
+        printf("Bottom Of Menu.\n");
+      }
+    }else{
+      printf("Menu Choice Ideling.\n");
+    }
+    printf("Current Menu Selection: %i.\n", selector_buf);
+  sleep_ms(5);
+
+  return selector_buf;
+}
 
 #endif

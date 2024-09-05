@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "resources/ili9488_screen_commands.h"
 #include "resources/ili9488_error_management.h"
 #include "resources/ili9488_power_control.h"
@@ -57,7 +58,7 @@ spi_packet_s data_packet = {
   .instance = NULL,
   .tx_buf = 0,
   .rx_buf = 0,
-  .rate = ONE_MBS,
+  .rate = FOUR_MBS,
   .length = 0,
   .spi_func_status = 0
 
@@ -89,11 +90,19 @@ spi_pins my_pins = {
   .mosi  = GPIO_ELEVEN,
   .csn   = GPIO_THIRTEEN,
   .sck   = GPIO_TEN,
-  .dc_rs = GPIO_FIFTEEN,
-  .reset = GPIO_FOURTEEN 
+  .dc_rs = GPIO_FOURTEEN,
+  .reset = GPIO_FIFTEEN 
 
 };
 
+typedef struct ili_init_var_s {
+    
+  struct ili_operation_var_s *my_op;
+  struct spi_packet_s *data_packet;
+  struct ili9488_window_var_s *my_window;
+struct spi_pin_manager_s *my_pins;
+
+}ili_init_var_s;
 
 
 //  Functions for hardware pins, CSn, DC/RS, RESET
@@ -110,6 +119,7 @@ void com_end(spi_pins *pins);
 void data_start(spi_pins *pins);
 void data_end(spi_pins *pins);
 
+func_ack ili_initialize(ili_init_var_s *init);
 static func_ack pin_validate(spi_pins *pins);
 func_ack initialize_spi_management(spi_inst_t *instance, uint32_t baudrate);
 func_ack deinitialize_spi_management(spi_inst_t *instance);
@@ -172,29 +182,30 @@ func_ack gpio_setup(spi_pins *pins){
 
     // set GPIO function as SPI for SCK, MOSI & MISO & CSN
     gpio_set_function(pins->sck, GPIO_FUNC_SPI);
-        pin_stat++;
+      pin_stat++;
     gpio_set_function(pins->mosi, GPIO_FUNC_SPI);
-        pin_stat++;
+      pin_stat++;
     gpio_set_function(pins->miso, GPIO_FUNC_SPI);
-        pin_stat++;
-    gpio_set_function(pins->csn, GPIO_FUNC_SPI);
-        pin_stat++;
+      pin_stat++;
+
 
     // initialise CE & CSN
-  //  gpio_init(pins->csn);
+    gpio_init(pins->csn);
+      pin_stat++;
     gpio_init(pins->dc_rs);
-        pin_stat++;
+      pin_stat++;
     gpio_init(pins->reset);
-        pin_stat++;
+      pin_stat++;
 
     // set direction for CE & CSN
-  //  gpio_set_dir(pins->csn, GPIO_OUT);
+    gpio_set_dir(pins->csn, GPIO_OUT);
+      pin_stat++;
     gpio_set_dir(pins->dc_rs, GPIO_OUT);
-        pin_stat++;
+      pin_stat++;
     gpio_set_dir(pins->reset, GPIO_OUT);
-        pin_stat++;
+      pin_stat++;
 
-    return (pin_stat == 8) ? pins_ack : func_error;
+    return (pin_stat == 9) ? pins_ack : func_error;
 
 }
 
@@ -212,61 +223,29 @@ static func_ack pin_validate(spi_pins *pins) {
 
   } validate_pin_t;
 
-  validate_pin_t spi_pins[5] = {
+  validate_pin_t spi_pins[3] = {
 
     (validate_pin_t) { .spi_pin = pins->mosi, .check_one = spi_tx_zz, .check_two = spi_tx_zo, .check_three = spi_tx_oo, .check_four = spi_tx_zt},
     (validate_pin_t) { .spi_pin = pins->miso, .check_one = spi_rx_zz, .check_two = spi_rx_zo, .check_three = spi_rx_oo, .check_four = spi_rx_zt},
-    (validate_pin_t) { .spi_pin = pins->csn, .check_one = spi_csn_zz, .check_two = spi_csn_zo, .check_three = spi_csn_oo, .check_four = spi_csn_zt},
     (validate_pin_t) { .spi_pin = pins->sck, .check_one = spi_sck_zz, .check_two = spi_sck_zo, .check_three = spi_sck_oo, .check_four = spi_sck_zt}
 
   };
 
-    //  Valid Pin setup: mosi - 0x01, miso - 0x02, csn - 0x04, sck - 0x08
+    //  Valid Pin setup: mosi - 0x01, miso - 0x02, sck - 0x04
   uint8_t valid_pins = 0;
 
-    for(int i = 0; i < 4; i++){
+  printf("Pins: %i.\n\t%i\n\t%i\n", spi_pins[0].check_one, spi_pins[1].check_two, spi_pins[2].check_three);
+    for(int i = 0; i < 3; i++){
 
-        if(i == 0){
 
-            if(spi_pins[0].spi_pin == (spi_pins[0].check_one || spi_pins[0].check_two || spi_pins[0].check_three || spi_pins[0].check_four)){
+    if(spi_pins[i].spi_pin == (spi_pins[i].check_one || spi_pins[i].check_two || spi_pins[i].check_three || spi_pins[i].check_four)){
                 
-                valid_pins += 0x01;
+    valid_pins += (0x01 << i);
 
-            }
-
-        }
-        if(i == 1){
-
-            if(spi_pins[1].spi_pin == (spi_pins[1].check_one || spi_pins[1].check_two || spi_pins[1].check_three || spi_pins[1].check_four)){
-                
-                valid_pins += 0x02;
-
-            }
-
-        }
-        if(i == 2){
-
-            if(spi_pins[2].spi_pin == (spi_pins[2].check_one || spi_pins[2].check_two || spi_pins[2].check_three || spi_pins[2].check_four)){
-                
-                valid_pins += 0x04;
-
-            }
-
-        }
-        if(i == 3){
-
-            if(spi_pins[1].spi_pin == (spi_pins[4].check_one || spi_pins[4].check_two || spi_pins[3].check_three || spi_pins[3].check_four)){
-                
-                valid_pins += 0x08;
-
-            }
-
-        }
-
+      }
     }
-
-
-  func_ack status = ((valid_pins & 0x0F) == true) ? pins_ack : func_error;
+    printf("Pin Values Ended At: 0x%02x.\n", valid_pins);
+  func_ack status = ((valid_pins & 0x07) == true) ? pins_ack : func_error;
   
   return status;
 }
@@ -302,7 +281,7 @@ func_ack pin_manager_configure(spi_packet_s *packet, spi_pins *pins) {
 };
 
 
-func_ack user_pin_initialize(spi_packet_s *inst, spi_pins *pins){
+func_ack user_pin_initialize(ili_init_var_s *init, spi_pins *pins){
 
     printf("Initializing user input pins for SPI.\n");
 
@@ -313,12 +292,12 @@ func_ack user_pin_initialize(spi_packet_s *inst, spi_pins *pins){
 
     printf("\nUser Defined Pins:\n\n\tMosi: %i\n\tMiso: %i\n\tSck: %i\n\tCSN: %i\n\tDC-RS: %i\n\n", pins->mosi, pins->miso, pins->sck, pins->csn, pins->dc_rs);
 
-    configure_status = pin_manager_configure(inst, pins);
+    configure_status = pin_manager_configure(init->data_packet, pins);
     printf("Configured: %s.\n", ((configure_status != 0) ? "Yes" : "No") );
 
     printf("Initialize SPI Protocol Parameters.\n");
 
-    rate_running = spi_init(inst->instance, inst->rate);
+    rate_running = spi_init(init->data_packet->instance, init->data_packet->rate);
 
     printf("Baudrate: 0x%08x.\n", rate_running);
 
@@ -380,7 +359,7 @@ void reset_put_low(bit rs){
 void reset_pulse(bit rs){
 
   reset_put_high(rs);
-    sleep_us(2);
+    sleep_ms(5);
   reset_put_low(rs);
 }
 
@@ -1226,7 +1205,7 @@ func_ack ili_fill(spi_packet_s *pack, sbit pixels[]){
     f_status += status;
     status = 0;
 
-        if(iterations > (max_iterations - 150)){
+        if(iterations < 50 ){
       printf("\n\nCurrent Iteration: %i.\n\tOut Of: %i\n\n", iterations, max_iterations);
         }
     }
@@ -1558,22 +1537,6 @@ ebit spi_read_data(spi_packet_s *inst){
     return (device > 0) ? device : 0x0000;
 
 }
-
-
-typedef struct ili_init_var_s {
-    
-  struct ili_operation_var_s *my_op;
-  struct spi_packet_s *data_packet;
-  struct ili9488_window_var_s *my_window;
-struct spi_pin_manager_s *my_pins;
-
-}ili_init_var_s;
-
-
-
-
-
-func_ack ili_initialize(ili_init_var_s *init);
 
 
 func_ack ili_initialize(ili_init_var_s *init){

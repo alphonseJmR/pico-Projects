@@ -13,4 +13,13 @@ target_include_directories(PUBLIC home/alphonse/Downloads/component_libs/Screen_
     add_subdirectory(ssd_1306_oled)
     add_subdirectory(_1602A_lcd)
 
-
+    target_link_libraries(
+      pico_stdlib
+      pico_multicore
+      hardware_gpio
+      hardware_adc
+      hardware_pwm
+      hardware_spi
+      hardware_i2c
+      hardware_dma
+)

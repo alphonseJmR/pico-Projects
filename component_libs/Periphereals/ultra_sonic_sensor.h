@@ -3,10 +3,16 @@
 
 #include <stdio.h>
 #include "resources/pico_pin_enum.h"
+#include "../hi_lvl_resources/project_struct_s.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
+#define calc_distance(a) (double)((a / 2.0) * 0.0343)
 
+// #define common_use
+#define turret_use
+
+#ifdef common_use
 
 ultra_sonic_data_t usonic;
 
@@ -57,24 +63,76 @@ void ultra_sonic_distance(ultra_sonic_data_t *data){
         data->distance_one = (data->pulse_duration_one / 2.0) * 0.0343; // Speed of sound is 343 m/s
         printf("Distance: %.2f cm\n", data->distance_one);
         data->returned_distance_one = data->distance_one;
-/*
-        // Wait for the echo pulse
-        while (gpio_get(data->echo_two) == 0) {}
-        data->usonic_one_start = time_us_32();
-
-        while (gpio_get(data->echo_two) == 1) {}
-        data->usonic_one_end = time_us_32();
-
-        // Calculate the distance
-        data->pulse_duration_two = data->usonic_two_end - data->usonic_two_start;
-        data->distance_two = (data->pulse_duration_two / 2.0) * 0.0343; // Speed of sound is 343 m/s
-        printf("Distance: %.2f cm\n", data->distance_two);
-        data->returned_distance_two = data->distance_two;
-*/
     }
 }
 
+#endif
 
+#ifdef turret_use
+
+void setup_hcsr04_sensor(hcsr04 *sensor){
+
+  printf("Initializing HC-SR04 Ultra Sonic Sensor.\n");
+
+    gpio_init(sensor->trigger_pin);
+    gpio_set_dir(sensor->trigger_pin, GPIO_OUT);
+
+    gpio_init(sensor->echo_pin);
+    gpio_set_dir(sensor->echo_pin, GPIO_IN);
+
+  printf("HC-SR04 Sensor Initialized.\n");
+
+}
+
+void send_trigger_pulse(hcsr04 *sensor){
+
+  gpio_put(sensor->trigger_pin, 1);
+    sleep_us(10);
+  gpio_put(sensor->trigger_pin, 0);
+
+}
+
+void get_distance(hcsr04 *sensor){
+
+//  printf("Detecting Distance.\n");
+
+  send_trigger_pulse(sensor);
+
+  while(gpio_get(sensor->echo_pin) == 0){}
+    sensor->time_start = time_us_32();
+    //  printf("Sensor Start Time: %i.\n", sensor->time_start);
+  while(gpio_get(sensor->echo_pin) == 1){}
+    sensor->time_end = time_us_32();
+    //  printf("Sensor Detect Time: %i.\n", sensor->time_end);
+
+  sensor->pulse_duration = (sensor->time_end - sensor->time_start);
+  //  printf("Measured Pulse Duration: %i.\n", sensor->pulse_duration);
+      sleep_ms(100);
+    if(sensor->pulse_duration > 2000){
+  //    printf("Distance Out of range.\n");
+      sensor->distance = 0;
+    }else{
+  sensor->distance = calc_distance(sensor->pulse_duration);
+    printf("Current Distance: %.2f cm\n", sensor->distance);
+    }
+}
+
+bool check_for_detection(hcsr04 *sensor){
+
+    get_distance(sensor);
+
+  if(sensor->distance >= 10){
+    sensor->detection = true;
+  }else {
+  //  printf("\nNo Sensor Detection.\n\n");
+    sensor->detection = false;
+  }
+
+  return sensor->detection;
+
+}
+
+#endif
 
 
 #endif

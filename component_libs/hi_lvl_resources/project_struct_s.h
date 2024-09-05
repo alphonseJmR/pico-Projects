@@ -172,6 +172,16 @@ typedef struct {
 } register_pins;
 register_pins reg_pins;
 
+typedef struct lcd_register_pin_s {
+  
+  const uint8_t lcd_reg_data;
+  const uint8_t lcd_reg_latch;
+  const uint8_t lcd_reg_enable;
+  const uint8_t lcd_reg_clk;
+  const uint8_t lcd_rs;
+  const uint8_t lcd_e;
+
+}register_lcd;
 
 typedef struct {
   uint8_t register_value_zero;
@@ -184,6 +194,14 @@ typedef struct {
   uint8_t register_value_seven;
 } uint8_variables;
 uint8_variables u_vars;
+
+typedef struct turret_laser_s {
+    
+    uint8_t fire_pattern;
+    uint16_t fire_speed;
+    bool rotation_direction;
+
+}t_laser;
 
 
 typedef struct register_595_pin_s {
@@ -199,6 +217,28 @@ typedef struct register_595_pin_s {
     const uint8_t REGISTERS_CLK_LINE;
 
 } registered_pins;
+
+typedef struct lcd_line_data
+{
+
+  char line_one[16];
+  char line_two[16];
+  char line_three[20];
+  char line_four[20];
+
+} lcd_lines;
+
+typedef struct hc_sr04_t {
+
+  uint8_t trigger_pin;
+  uint8_t echo_pin;
+  uint32_t time_start;
+  uint32_t time_end;
+  uint32_t pulse_duration;
+  double distance;
+  bool detection;
+
+}hcsr04;
 
 
 typedef struct {
@@ -430,6 +470,7 @@ typedef struct input_type_s {
     
 }input_types;
 
+
 typedef struct nrf_timing_s {
 
   uint32_t nrf_total_transmit_time;
@@ -508,6 +549,33 @@ typedef struct nrf_connection_status_s {
   bool reset;
 
 } nrf_status;
+
+typedef struct nrf_verification_var_s {
+
+  bool nrf_initial_bypass;
+  bool reset_nrf;
+  uint8_t transmit_NCS;
+  uint8_t transmit_RAN;
+  uint32_t pkt_tx_time;
+  uint32_t pkt_rx_time;
+
+}nrf_verify;
+
+typedef struct setup_nrf_s {
+
+volatile bool nrf_setup_complete;
+volatile bool channel_complete;
+volatile bool data_rate_complete;
+volatile bool power_complete;
+uint8_t setting_val;
+uint8_t prev_val;
+char top_line[16];
+char bottom_line[16];
+uint8_t channel_set;
+uint8_t data_set;
+uint8_t power_set;
+
+}nrf_setup;
 
 
 #endif

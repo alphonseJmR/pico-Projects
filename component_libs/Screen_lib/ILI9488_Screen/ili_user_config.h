@@ -8,9 +8,10 @@
 #include "resources/ili9488_power_control.h"
 #include "includes/ili9488_char_set.h"
 #include "includes/ili9488_struct_s.h"
+// #include "includes/ili9488_function_s.h"
 #include "hardware/spi.h"
 
-#define bit uint
+#define bit uint8_t
 #define ebit uint8_t
 #define sbit uint16_t
 #define len size_t
@@ -28,18 +29,14 @@
 #define max_iterations (int)(ILI_LCD_WIDTH * ILI_LCD_HEIGHT)
 
 ebit pixel_cache[(max_iterations / 3)][3];
-ebit *com;
-ebit *COM;
-ebit *COMM;
-ebit *DAT;
-ebit *DATA;
-ebit *dat;
-ebit *d_one;
-ebit *d_two;
-ebit *d_three;
-ebit *d_four;
 
-const uint8_t init_comms[13] = {
+spi_packet_s* spi_buffer(spi_packet_s *temp, uint8_t data){
+
+  temp->tx_buf[0] = data;
+  return temp;
+}
+
+ const uint8_t init_comms[13] = {
 
   0xE0,   //  Positive Gamma Control
   0xE1,   //  Negative Gamma Control
@@ -57,7 +54,7 @@ const uint8_t init_comms[13] = {
 
 };
 
-const uint8_t pos_gamma_dat[15] = {
+ const uint8_t pos_gamma_dat[15] = {
 
   0x00,
   0x03,
@@ -77,7 +74,7 @@ const uint8_t pos_gamma_dat[15] = {
 
 };
 
-uint8_t neg_gamma_dat[15] = {
+ const uint8_t neg_gamma_dat[15] = {
 
   0x00,
   0x16,
@@ -97,23 +94,22 @@ uint8_t neg_gamma_dat[15] = {
 
 };
 
-uint8_t pwr_con_o[2] = {
+ const uint8_t pwr_con_o[2] = {
   0x17,
   0x15
 };
 
-uint8_t pwr_con_t[1] = {
+ const uint8_t pwr_con_t[1] = {
   0x41
 };
 
-uint8_t vcom_ctrl[3] = {
+ const uint8_t vcom_ctrl[3] = {
   0x00,
   0x12,
   0x80
 };
 
-uint8_t display_func_ctrl[3] =
-{
+ const uint8_t display_func_ctrl[3] = {
   0x02,
   0x02,
   0x3B
@@ -127,7 +123,6 @@ struct ili_font_s my_font = {
 
 };
 
-
 ili_operation_var_s my_op = {
 
 .ili_width = ILI_LCD_WIDTH,
@@ -137,12 +132,11 @@ ili_operation_var_s my_op = {
 
 };
 
-
 spi_packet_s data_packet = {
   .instance = NULL,
   .tx_buf[0] = 0,
   .rx_buf[0] = 0,
-  .rate = ONE_MBS,
+  .rate = FOUR_MBS,
   .length = 0,
   .spi_func_status = 0
 
@@ -157,8 +151,6 @@ limits my_limits = {
 
 };
 
-
-
 ili9488_window_var_s my_window = {
 
 .dw_X = 20,
@@ -168,12 +160,11 @@ ili9488_window_var_s my_window = {
 
 };
 
-
 spi_pins my_pins = {
 
   .miso = GPIO_TWELVE,
   .mosi = GPIO_ELEVEN,
-  .csn = GPIO_THIRTEEN,
+  .csn = GPIO_NINE,
   .sck = GPIO_TEN,
   .dc_rs = GPIO_FOURTEEN,
   .reset = GPIO_FIFTEEN
@@ -183,29 +174,16 @@ spi_pins my_pins = {
 init_var_s my_init = {
 
   .my_op = &my_op,
-  .data_packet = &data_packet,
+  .data_pack = &data_packet,
   .my_window = &my_window,
   .my_pins = &my_pins,
-  .spi_buffer = spi_buffer
 
 };
 
-struct spi_packet_s spi_buffer(uint8_t data){
+spib spi_d = {
 
-  spi_packet_s temp_pack =
-  {
-    .instance = my_init.data_packet,
-    .tx_buf[0] = data,
-    .rx_buf[0] = 0,
-    .rate = ONE_MBS,
-    .length = 0,
-    .spi_func_status = 0
+    .spi_buffer = spi_buffer
 
-  };
-
-  return temp_pack;
-
-}
-
+};
 
 #endif

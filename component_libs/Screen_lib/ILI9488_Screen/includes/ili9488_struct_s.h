@@ -9,7 +9,7 @@
 #include "hardware/gpio.h"
 
 
-#define bit uint
+#define bit uint8_t
 #define ebit uint8_t
 #define sbit uint16_t
 #define len size_t
@@ -20,7 +20,7 @@
 typedef struct spi_packet_s {
     
     spi_inst_t *instance;
-const ebit tx_buf[1];
+    ebit tx_buf[1];
     ebit rx_buf[1];
     baud rate;
     ebit length;
@@ -97,29 +97,34 @@ typedef struct spi_pin_manager_s {
 
 }spi_pins;
 
+typedef struct spi_buffer_function_t {
+  spi_packet_s* (*spi_buffer)(spi_packet_s *temp, uint8_t data);
+}spib;
+
 typedef struct init_var_s {
     
   struct ili_operation_var_s *my_op;
-  struct spi_packet_s *data_packet;
+  struct spi_packet_s *data_pack;
   struct ili9488_window_var_s *my_window;
   struct spi_pin_manager_s *my_pins;
-  struct spi_packet_s* (*spi_buffer)(uint8_t data);
 
 }init_var_s;
 
 typedef struct ili9488_init_function_s {
 
-  func_ack (*pos_g_ctrl)(spi_packet_s *pack, const uint8_t *com, const uint8_t *gam_data);
-  func_ack (*neg_g_ctrl)(spi_packet_s *pack,  const uint8_t *com, const uint8_t *data);
-  func_ack (*pwr_ctrl_o)(spi_packet_s *pack,  const uint8_t *com, const uint8_t *data);
-  func_ack (*pwr_ctrl_t)(spi_packet_s *pack, const uint8_t *com, const uint8_t *data);
+  func_ack (*pos_g_ctrl)(spi_packet_s *pack, uint8_t com, const uint8_t *gam_data);
+  func_ack (*neg_g_ctrl)(spi_packet_s *pack,  uint8_t com, const uint8_t *data);
+  func_ack (*pwr_ctrl_o)(spi_packet_s *pack,  uint8_t com, const uint8_t *data);
+  func_ack (*pwr_ctrl_t)(spi_packet_s *pack, uint8_t com, const uint8_t *data);
   func_ack (*vcom_ctrl)(spi_packet_s *pack, uint8_t com, const uint8_t *data);
   func_ack (*mem_acc_ctrl)(spi_packet_s *pack, uint8_t com, uint8_t data);
   func_ack (*pix_intr_format)(spi_packet_s *pack, uint8_t com, uint8_t data);
   func_ack (*intr_mode_ctrl)(spi_packet_s *pack, uint8_t com, uint8_t data);
   func_ack (*frame_rate_ctrl)(spi_packet_s *pack, uint8_t com, uint8_t data);
-  func_ack (*display_inversion)(spi_packet_s *pack, uint8_t com, uint8_t data)
-
+  func_ack (*display_inversion)(spi_packet_s *pack, uint8_t com, uint8_t data);
+  func_ack (*display_func_ctrl)(spi_packet_s *pack, uint8_t com, const uint8_t *data);
+  func_ack (*sleep_out)(spi_packet_s *pack, uint8_t com);
+  func_ack (*display_on)(spi_packet_s *pack, uint8_t com);
 
 }ili9488_funcs;
 

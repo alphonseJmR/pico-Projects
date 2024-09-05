@@ -12,9 +12,11 @@ target_include_directories(PUBLIC home/alphonse/Downloads/component_libs/Screen_
     add_subdirectory(ILI9488_Screen)
     add_subdirectory(ssd_1306_oled)
     add_subdirectory(_1602A_lcd)
+target_include_directories(PUBLIC home/alphonse/Downloads/component_libs/displays)
     
     target_link_libraries(
       pico_stdlib
+      pico_multicore
       hardware_gpio
       hardware_adc
       hardware_pwm

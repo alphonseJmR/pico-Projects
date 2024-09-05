@@ -9,6 +9,8 @@
 #include "2004a_error_management.h"
 #include "_2004A_commands.h"
 
+#define _2x16_LCD
+
 #define low_b 0x40
 #define med_low_b 0x50
 #define medium_b 0x10
@@ -19,16 +21,6 @@
 
 #define lcd_rs_pin 14
 #define lcd_e_pin 15
-
-typedef struct lcd_line_data
-{
-
-  char line_one[20];
-  char line_two[20];
-  char line_three[20];
-  char line_four[20];
-
-} lcd_lines;
 
 lcd_lines my_lcd_lines = {
 
@@ -560,5 +552,6 @@ void e_pulse(void){
     sleep_us(50);
   gpio_put(lcd_e_pin, 0);
 }
+
 
 #endif

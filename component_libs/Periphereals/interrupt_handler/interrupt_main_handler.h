@@ -9,11 +9,15 @@
 #include "pico/time.h"
 #include "Periphereals/resources/pico_pin_enum.h"
 
+#define turret_button_irq_handler
+// #define general_button_irq_handler
 
-bool initialize_repeating_timer(int64_t delay, repeating_timer_callback_t callback, repeating_timer_t *out);
+
 void set_readied_values(payload_data *load, nrf_status *cons, pre_calcs *pres, pay_size *load_s);
-uint8_t interruption_input_initialisation(input_types *ins);
-void button_interrupt_handler(input_types *butts, uint gpio);
+void interruption_input_initialisation(input_types *ins);
+//uint8_t interruption_input_initialisation(input_types *ins);
+void button_interrupt_handler(input_types *butts, uint gpio, uint32_t events);
+//void button_interrupt_handler(input_types *butts, uint gpio);
 bool buttons_timer(input_types *my_ren);
 bool callback_timer(input_types *my_ren);
 void rotary_encoder_handler(input_types *ren, uint gpio, uint32_t events);
@@ -27,15 +31,70 @@ repeating_timer_t motor_timer;
 bool timed_result;
 
 
-//  If false return, no timer added.
-bool initialize_repeating_timer(int64_t delay, repeating_timer_callback_t callback, repeating_timer_t *out){
+#ifdef turret_button_irq_handler
 
-    bool t_status;
+void main_interrupt_handler(uint gpio, uint32_t events){
 
-    t_status = add_repeating_timer_ms(delay, callback, NULL, out);
-
-    return t_status;
+    printf("\n////\tMain Interrupt Handler\t////\n");
+        gpio_acknowledge_irq(gpio, events);
+    button_interrupt_handler(&turret_buttons, gpio, events);
+  
 }
+
+
+void button_interrupt_handler(input_types *butts, uint gpio, uint32_t events){
+
+    if(gpio == butts->t_buttons.b_zero){
+        
+        printf("Button One Pressed.\n");
+          butts->t_buttons.b_ze_status = true;
+        printf("Button One Currently: %i.\n", (butts->t_buttons.b_ze_status) ? 1 : 0);
+
+    }else if(gpio == butts->t_buttons.b_one){
+        printf("Button Two Pressed.\n");
+          butts->t_buttons.b_on_status = true;
+        printf("Button Two Currently: %i.\n", (butts->t_buttons.b_on_status) ? 1 : 0);
+    }
+}
+
+void interruption_input_initialisation(input_types *ins){
+
+    if(ins->t_buttons.b_zero != UNDEFINED){
+        gpio_init(ins->t_buttons.b_zero);
+        gpio_set_dir(ins->t_buttons.b_zero, GPIO_IN);
+            gpio_pull_down(ins->t_buttons.b_zero);
+        gpio_set_irq_enabled_with_callback(ins->t_buttons.b_zero, 0x04, true, &main_interrupt_handler);
+            ins->t_buttons.b_ze_status = false;
+            printf("Button: %i Initialised.\n", ins->t_buttons.b_zero);
+
+    }else{
+        printf("No Pin Initialised.\n");
+    }
+
+    if(ins->t_buttons.b_one != UNDEFINED){
+        gpio_init(ins->t_buttons.b_one);
+        gpio_set_dir(ins->t_buttons.b_one, GPIO_IN);
+            gpio_pull_down(ins->t_buttons.b_one);
+        gpio_set_irq_enabled_with_callback(ins->t_buttons.b_one, 0x04, true, &main_interrupt_handler);
+            ins->t_buttons.b_on_status = false;
+            printf("Button: %i Initialised.\n", ins->t_buttons.b_one);
+    }else{
+        printf("No Pin Initialised.\n");
+    }
+
+}
+
+void reset_button_status(input_types *in){
+
+    printf("Reset Button Status's to false.\n\n");
+
+    in->t_buttons.b_ze_status = false;
+    in->t_buttons.b_on_status = false;
+}
+
+#endif
+
+#ifdef general_button_irq_handler
 
 void main_interrupt_handler(uint gpio, uint32_t events){
 
@@ -51,6 +110,42 @@ void main_interrupt_handler(uint gpio, uint32_t events){
   }else {
     button_interrupt_handler(&my_types, gpio);
   }
+}
+
+
+void button_interrupt_handler(input_types *butts, uint gpio){
+
+    if(gpio == butts->r_en.REB){
+        printf("Rotary Button Pressed.\n");
+         butts->t_buttons.reb_status = true;
+
+    }else if(gpio == butts->t_buttons.b_zero){
+        printf("Button One Pressed.\n");
+          butts->t_buttons.b_ze_status = true;
+
+    }else if(gpio == butts->t_buttons.b_one){
+        printf("Button Two Pressed.\n");
+          butts->t_buttons.b_on_status = true;
+
+    }else if(gpio == butts->t_buttons.b_two){
+        printf("Button Three Pressed.\n");
+          butts->t_buttons.b_tw_status = true;
+
+    }else if(gpio == butts->t_buttons.b_three){
+        printf("Button Four Pressed.\n");
+          butts->t_buttons.b_th_status = true;
+
+    }else if(gpio == butts->t_buttons.b_four){
+        printf("Button Four Pressed.\n");
+          butts->t_buttons.b_fo_status = true;
+
+    }else if(gpio == butts->t_buttons.b_five){
+        printf("Button Five Pressed.\n");
+          butts->t_buttons.b_fi_status = true;
+    }
+    
+    butts->button_value += button_incrementer(butts);
+
 }
 
 void rotary_encoder_handler(input_types *ren, uint gpio, uint32_t events){
@@ -111,42 +206,6 @@ bool buttons_timer(input_types *my_ren){
     test_result = (my_ren->t_buttons.last_button >= my_ren->t_buttons.max_button_interrupt) ? true : false;
 
     return test_result;
-}
-
-void button_interrupt_handler(input_types *butts, uint gpio){
-
-    if(gpio == butts->r_en.REB){
-        printf("Rotary Button Pressed.\n");
-         butts->t_buttons.reb_status = true;
-
-    }else if(gpio == butts->t_buttons.b_zero){
-        printf("Button One Pressed.\n");
-          butts->t_buttons.b_ze_status = true;
-
-    }else if(gpio == butts->t_buttons.b_one){
-        printf("Button Two Pressed.\n");
-          butts->t_buttons.b_on_status = true;
-
-    }else if(gpio == butts->t_buttons.b_two){
-        printf("Button Three Pressed.\n");
-          butts->t_buttons.b_tw_status = true;
-
-    }else if(gpio == butts->t_buttons.b_three){
-        printf("Button Four Pressed.\n");
-          butts->t_buttons.b_th_status = true;
-
-    }else if(gpio == butts->t_buttons.b_four){
-        printf("Button Four Pressed.\n");
-          butts->t_buttons.b_fo_status = true;
-
-    }else if(gpio == butts->t_buttons.b_five){
-        printf("Button Five Pressed.\n");
-          butts->t_buttons.b_fi_status = true;
-    }
-    
-    butts->button_value += button_incrementer(butts);
-    
-    
 }
 
 uint8_t interruption_input_initialisation(input_types *ins){
@@ -265,6 +324,10 @@ uint8_t interruption_input_initialisation(input_types *ins){
     return pin_count;
 
 }
+
+
+#endif
+
 
 uint16_t button_incrementer(input_types *butts){
 

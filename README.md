@@ -74,18 +74,33 @@
 
 ## Current goals:
 
+  RF Controller - Main Running Components
+  #### LCD Screen  -- In Next Hardware Design, I'll Use SSD1306 screens.
+    -- Run via PIO
+  #### SN74HC165 Shift Register -> As Input For -> Triple Rotary Encoder
+    -- Run via PIO, DMA, and Timers.
+  #### Dual analog stick input - ADC read
+
+  #### NRF24L01 Radio Module
+
   Continue building program for rc_controller & rc_receiver.
   1/17/2024 - Currently tackling trying to control a 1602a v5.5 LCD screen via a CD74HC595E shift register.
       The function to perform this requries some bit manipulation due to my wiring.  Over time I'm hoping to adopt it to be more versatile.
 
-  7/06/2024 - Currently running tests to optimize the speed between analog input and reaction time to the
+  7/06/2024 - Currently running tests to optimize the speed between analog input and reaction time to the receiver?
 
-  Have recently been running into trouble with the nrf24 driver, yet, due to lack of test equipment (or knowledge) I'm unsure if it was the code/hardware/connections.  It's currently active.
+  4/20/2025 - (or at some point) Successfully implemented an ili9488 driver, and wrote a game for use with it, as well as a nametag for the below happening.
+
+  7/19/2025 - Went to OpenSauce in California.  It was fking epic.
+
+  9/01/2025 - Currently refactoring previous attempts of controller.  Currently v4.  Update on the 1602/2004a screens via shift register, they work, but will not be implemented in the controller project.  Due to my design error, the code for the rotary encoder system on the controller is different than what it is on my proto pcb.  There may also be other issues because I'm using reclaimed parts from other projects (and I'm not great at desoldering).  I've also added a 4 pin DIP switch to use to be able to select what program to start upon power on.
+
+  Have recently been running into trouble with the nrf24 driver (9/1/25 - will see if I can rewrite some stuff there), yet, due to lack of test equipment (or knowledge) I'm unsure if it was the code/hardware/connections.  It's currently active.
 
 ## Future goals (not in order):
- 1.  Refactor entire RC car code into an appropriate project.
- 2.  Add features to make configuring the project simple.
- 4.  Optimize code base for quick and agile actions between the transmitter and receiver.  // current goal, adc->dma->nrf
- 5.  Add dual-core for better optimization.
+ 1.  Refactor entire RC car code into an appropriate project.  (9/1/25 - Have started)
+ 2.  Add features to make configuring the project simple.  (9/1/25 - In works with refactor above)
+ 4.  Optimize code base for quick and agile actions between the transmitter and receiver.  // current goal, adc->dma->nrf (9/1/25 - implementation in progress)
+ 5.  Add dual-core for better optimization. (9/1/25 - in progress with analog stick ADC)
 
   

@@ -1,0 +1,462 @@
+.program lcd_driver
+
+.wrap_target
+
+setup:
+  pull Block              ; Pull RS toggle bit from TX_Fifo
+  set pins, 0x00          ; Pull RS & Enable Low
+  mov x, OSR              ; Send bit to X for conditional jmp
+  jmp !x, command         ; If X equals 0, we jump to command, else continue to character
+  jmp character           ; Testing if this actually jmps to char
+
+
+character:
+  set pins, 0x01  [15]     ; Set RS pin HIGH
+  pull Block               ; We now pull in the data to send
+  mov OSR, :: OSR          ; Reverse data in OSR
+  out null, 24             ; Push data forward into the correct position
+  set pins, 0x03  [15]     ; Pull Enable HIGH next, leaving RS HIGH too
+  out pins, 4     [3]      ; Send out the first four bits, or the MSB nibble of data
+  set pins, 0x01  [15]     ; latch in first nibble.
+  set pins, 0x03  [15]     ; set enable high again
+  out pins, 4     [3]      ; Send out the second four bits, or the LSB nibble of data
+  set pins, 0x00  [15]     ; latch in second nibble
+  jmp setup       [5]      ; Jump to sending data
+
+command:
+  pull Block               ; We now pull in the data to send
+  mov OSR, :: OSR          ; Reverse data in OSR
+  out null, 24             ; Push data forward into the correct position
+  set pins, 0x02  [15]     ; RS is already low, now we pull Enable HIGH
+  out pins, 4     [3]      ; Send out the first four bits, or the MSB nibble of data
+  set pins, 0x00  [15]     ; latch in first nibble
+  set pins, 0x02  [15]     ; set enable high again
+  out pins, 4     [3]      ; send out second four bits, or the LSB nibble of data
+  set pins, 0x00  [15]     ; latch in the second nibble
+  jmp setup       [5]      ; Jump to sending data
+
+.wrap
+  
+% c-sdk {
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include "_2004A_commands.h"
+  #include "hardware/pio.h"
+  #include "hardware/gpio.h"
+
+  #define ddram_addr 0x80
+
+  static const uint8_t _1602a_line1[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+static const uint8_t _1602a_line2[] = {0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F};
+  
+
+typedef struct pio_lcd_cfig_s {
+  PIO port;
+  uint8_t sm;
+  uint8_t offset;
+
+  uint8_t rs;
+  uint8_t en;
+  uint8_t d4;
+  uint8_t d5;
+  uint8_t d6;
+  uint8_t d7;
+
+}lcd_pio;
+
+
+
+  //  PIO program lcd program pio init - second step
+  static inline void lcd_pio_init(lcd_pio *cfig){
+   uint8_t sev = 7;
+    pio_sm_config c = pio_get_default_sm_config();
+    pio_sm_set_consecutive_pindirs(cfig->port, cfig->sm, cfig->d7, 6, true);
+
+    for(uint8_t a = cfig->d7; a <= cfig->d4; a++){
+        printf("PIO GPIO Initializing data_%i: %i.\n", (sev--), a);
+      pio_gpio_init(cfig->port, a);
+      gpio_pull_down(a);
+    }
+
+    for(uint8_t b = cfig->rs; b <= cfig->en; b++){
+      printf("PIO GPIO Initializing: %i.\n", b);
+      pio_gpio_init(cfig->port, b);
+    }
+
+    sm_config_set_out_pins(&c, cfig->d7, 4);
+    sm_config_set_set_pins(&c, cfig->rs, 2);
+  //  sm_config_set_sideset_pins(&c, pins->rs);
+  //  sm_config_set_sideset(&c, 2, true, false);
+    sm_config_set_out_shift(&c, true, false, 8);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+    sm_config_set_clkdiv(&c, 10000);
+    pio_sm_init(cfig->port, cfig->sm, cfig->offset, &c);
+
+  }
+
+
+  //  PIO program lcd program add check - first step
+  bool add_lcd_driver_program(lcd_pio *cfig){
+    bool status = false;
+    status = pio_can_add_program(cfig->port, &lcd_driver_program);
+      printf("Register: LCD - Status: %s.\n", (status ? "Available" : "Not Available"));
+    if(status){
+      cfig->offset = pio_add_program(cfig->port, &lcd_driver_program);
+    }
+    return status;
+  }
+
+
+//  PIO program lcd program INIT - final step
+  void init_lcd_driver_program(lcd_pio *cfig){
+    if(add_lcd_driver_program(cfig)){
+      lcd_pio_init(cfig);
+      pio_sm_set_enabled(cfig->port, cfig->sm, true);
+    }
+  }
+
+
+  uint8_t byte_flip(uint8_t d_in){
+    uint8_t a, b, c = 0;
+    a = (d_in & 0xF0);
+    b = (d_in & 0x0F);
+    c = ((a >> 4) | (b << 4));
+
+    return c;
+  }
+
+  
+  //  Parameters are uint8_t data and reg_sel, along with PIO params
+  //  Reg_sel true == CHAR, false == COMM
+  void send_byte(lcd_pio *cfig, uint8_t data, bool reg_sel){
+
+    uint32_t output = 0;
+
+    output = (uint8_t)reg_sel;
+    pio_sm_put_blocking(cfig->port, cfig->sm, output);
+        sleep_us(120);
+    output = data;
+    pio_sm_put_blocking(cfig->port, cfig->sm, data);
+
+    
+  }
+
+
+  void clear_screen(lcd_pio *cfig){
+    send_byte(cfig, 0x01, false);
+  }
+
+
+  void send_comm(lcd_pio *cfig, uint8_t command){
+    send_byte(cfig, command, false);
+  }
+
+
+  void send_char(lcd_pio *cfig, char char_data){
+    send_byte(cfig, (uint8_t)char_data, true);
+  }
+
+
+  void send_cursor_pos(lcd_pio *cfig, uint8_t row, uint8_t col){
+    uint8_t set_addr = 0;
+    if(row == 1 && col >= 1 && col <= 16){
+      set_addr = _1602a_line1[col - 1];
+  //      printf("Setting DDRAM addr row 1: 0x%04x.\n", set_addr);
+    }else if(row == 2 && col >= 1 && col <= 16){
+      set_addr = _1602a_line2[col - 1];
+  //      printf("Setting DDRAM addr row 2: 0x%04x.\n", set_addr);
+    }else {
+      printf("Invalid Row or Column choice.\n");
+    }
+  //    printf("Sending Cursor Command: 0x%02x.\n", (0x80 | set_addr));
+    send_comm(cfig, (0x80 | set_addr));
+  }
+
+
+ void send_home(lcd_pio *cfig){
+    sleep_ms(50);
+  send_comm(cfig, 0x02);
+    sleep_ms(50);
+ }
+
+
+ //  Send string should be configurable for n amount of chars per line (max 20?)
+  void send_string(lcd_pio *cfig, char *char_ray, uint8_t char_lim){
+    for(uint8_t a = 0; a < char_lim; a++){
+      send_char(cfig, char_ray[a]);
+      sleep_ms(10);
+    }
+    //  sleep_ms(100);
+  }
+
+
+  void send_display(lcd_pio *cfig, char *fst_line, char *snd_line, uint8_t char_lim){
+    send_cursor_pos(cfig, 1, 1);
+//  send_home(pio, SM);
+    send_string(cfig, fst_line, char_lim);
+
+  send_cursor_pos(cfig, 2, 1);
+    send_string(cfig, snd_line, char_lim);
+  }
+
+
+
+  void init_lcd(lcd_pio *cfig){
+
+    printf("Beginning 1602 LCD initialization now.\n");
+
+      send_comm(cfig, 0x02);
+        sleep_ms(100);
+      send_comm(cfig, 0x03);
+        sleep_ms(100);
+      send_comm(cfig, 0x03);
+        sleep_ms(100);
+      send_comm(cfig, 0x03);
+        sleep_ms(100);
+      send_comm(cfig, 0x28);
+        sleep_ms(100);
+  //    send_comm(pio, SM, 0x0B);
+  //      sleep_ms(100);
+  //    send_comm(pio, SM, 0x07);
+  //      sleep_ms(100);
+     send_comm(cfig, 0x02);
+        sleep_ms(100);
+
+    printf("LCD Should be initialized now.\n");
+
+  }
+
+
+
+  void init_2004_lcd(lcd_pio *cfig){
+    printf("Beginning 2004 LCD initialization now.\n");
+
+      send_comm(cfig, 0x02 | 0x80);
+        sleep_ms(100);
+      send_comm(cfig, 0x08 | 0x04);
+        sleep_ms(100);
+      send_comm(cfig, 0x04 | 0x02);
+        sleep_ms(100);
+      send_comm(cfig, 0x01);
+        sleep_ms(100);
+
+    printf("LCD Should be initialized now.\n");
+  }
+
+
+  void set_2004_line(lcd_pio *cfig, uint8_t line_num, uint8_t pos){
+
+    uint8_t set_position = 0x00;
+    uint8_t line_addresses[] = {0x00, 0x40, 0x14, 0x54};
+      set_position = (ddram_addr | (line_addresses[line_num] + pos));
+
+    send_comm(cfig, set_position);
+    sleep_ms(10);
+
+  }
+
+
+  void _2004_send_string_at_line(lcd_pio *cfig, char *str, uint8_t line_num, uint8_t line_pos){
+    
+    set_2004_line(cfig, line_num, line_pos);
+    send_string(cfig, str, 21);
+
+  }
+
+/*
+  void set_2004_display(PIO pio, uint SM, char *f_l, char *se_l, char *t_l, char *fo_l){
+
+    set_2004_line(pio, SM, 0, 0);
+      send_string(pio, SM, f_l, 20);
+    
+    set_2004_line(pio, SM, 1, 0);
+      send_string(pio, SM, se_l, 20);
+
+    set_2004_line(pio, SM, 2, 0);
+      send_string(pio, SM, t_l, 20);
+
+    set_2004_line(pio, SM, 3, 0);
+      send_string(pio, SM, fo_l, 20);
+
+  }
+*/
+%}
+
+
+
+
+.program cdhc_out_register
+.wrap_target
+
+ready_reg:
+  wait 1 gpio 6
+  pull Block
+;  mov OSR, :: OSR
+;  out null, 16
+	set X,    0x0F
+
+write_reg:
+  set pins, 0x00
+	out pins,  1
+  set pins, 0x04
+	jmp x-- write_reg
+
+  set pins 0x01
+;  pull NoBlock
+	jmp ready_reg
+
+.wrap
+
+% c-sdk {
+  /*
+#include <stdlib.h>
+#include "hardware/pio.h"
+#include "hardware/gpio.h"
+
+#define color_output(a,b,c,d,e) (uint16_t)(( (~a & 0x0F) << 12 ) | ((b & 0x07) << 9) | ((c & 0x07) << 6) | ((d & 0x07) << 3) | ((e & 0x07) ))
+#define ebit uint8_t
+#define sibit uint16_t
+
+
+ typedef struct pio_rgb_s {
+
+  uint8_t d_line;
+  uint8_t l_line;
+  uint8_t oe_line;
+  uint8_t clk_line;
+
+}pio_led_s;
+
+typedef struct master_pio_config_s {
+
+    PIO lcd_pio;
+    PIO shift_in_pio;
+    PIO shift_out_pio;
+
+    ebit lcd_sm;
+    ebit si_sm;
+    ebit so_sm;
+
+    sibit lcd_offset;
+    sibit si_offset;
+    sibit so_offset;
+
+    const pio_program_t *lcd_pro;
+    const pio_program_t *si_pro;
+    const pio_program_t *so_pro;
+
+    bool lcd_crun;
+    bool si_crun;
+    bool so_crun;
+
+}master_config;
+
+bool can_master_run(master_config *setup){
+    bool test_result = false;
+
+    setup->lcd_crun = pio_can_add_program(setup->lcd_pio, setup->lcd_pro);
+    setup->si_crun = pio_can_add_program(setup->shift_in_pio, setup->si_pro);
+    setup->so_crun = pio_can_add_program(setup->shift_out_pio, setup->so_pro);
+
+    test_result = (setup->lcd_crun & setup->si_crun & setup->so_crun) ? true : false;
+    return test_result;
+
+}
+
+void add_pio_program(master_config *conf){
+
+    if(can_master_run(conf)){
+        conf->lcd_offset = pio_add_program(conf->lcd_pio, conf->lcd_pro);
+            printf("Lcd PIO Program OFFSET value: %i.\n", conf->lcd_offset);
+        conf->si_offset = pio_add_program(conf->shift_in_pio, conf->si_pro);
+            printf("hc165 PIO Program OFFSET value: %i.\n", conf->si_offset);
+        conf->so_offset = pio_add_program(conf->shift_out_pio, conf->so_pro);
+            printf("hc595 PIO Program OFFSET value: %i.\n", conf->so_offset);
+    }else{
+        if(!conf->lcd_crun){
+            printf("LCD PIO program unable to be added.\n");
+        }else if(!conf->si_crun){
+            printf("Shift IN PIO program unable to be added.\n");
+        }else if(!conf->so_crun){
+                    printf("Shift OUT PIO program unable to be added.\n");
+        }else{
+            printf("One or more PIO programs unable to be loaded.\n");
+        }
+
+    }
+
+}
+
+ static inline void register_out_init(PIO pio, uint sm, uint offset, pio_led_s *pins){
+	
+  pio_sm_set_consecutive_pindirs(pio, sm, pins->d_line, 4, true);
+	pio_sm_config c = pio_get_default_sm_config();
+ 	pio_gpio_init(pio, pins->d_line);  			  // ex pin 3
+		  gpio_pull_down(pins->d_line);
+ 	pio_gpio_init(pio, pins->l_line);  	      // ex pin 4
+ 	pio_gpio_init(pio, pins->oe_line);  	    // ex pin 5
+	pio_gpio_init(pio, pins->clk_line);			  // ex pin 6
+	sm_config_set_out_pins(&c, pins->d_line, 1);
+	sm_config_set_set_pins(&c, pins->l_line, 3);
+
+ 	sm_config_set_out_shift(&c, true, false, 1);
+	sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+	sm_config_set_clkdiv(&c, 12500);
+	pio_sm_init(pio, sm, offset, &c);
+
+ }
+
+void send_pio_data(pio_pad *num, master_config *en){
+    uint16_t buffer_correct = 0x0000;
+
+    buffer_correct = (color_output(0x0F, num->num_one, num->num_two, num->num_three, num->num_four) & 0xFFFF);
+      printf("Sending PIO: 0x%08x.\n",buffer_correct);
+    pio_sm_put_blocking(en->shift_out_pio, en->so_sm, buffer_correct );
+}
+
+//  This only works because we turn off rgb's and send zeros.
+void mask_master_code(uint16_t mask, master_config *config){
+      printf("\nMasking Master Code.");
+      printf("\nSending PIO: 0x%08x.\n", mask);
+    pio_sm_put_blocking(config->shift_out_pio, config->so_sm, mask );
+}
+
+void mask_rgb(uint8_t irq, uint16_t mask, master_config *config){
+  gpio_put(irq, 1);
+      printf("Sending Mask\n");
+    pio_sm_put_blocking(config->shift_out_pio, config->so_sm, mask);
+  gpio_put(irq, 0);
+}
+
+void set_pio_inits(master_config *setup, pio_lcd *pins, pio_smp *pint, pio_led_s *pind){
+
+  lcd_pio_init(setup->lcd_pio, setup->lcd_sm, setup->lcd_offset, pins);
+  register_out_init(setup->shift_out_pio, setup->so_sm, setup->so_offset, pind);
+  register_in_init(setup->shift_in_pio, setup->si_sm, setup->si_offset, pint);
+
+  pio_sm_set_enabled(setup->lcd_pio, setup->lcd_sm, true);
+  pio_sm_set_enabled(setup->shift_in_pio, setup->si_sm, true);
+  pio_sm_set_enabled(setup->shift_out_pio, setup->so_sm, true);
+
+  init_2004_lcd(setup->lcd_pio, setup->lcd_sm);
+}
+
+void output_led_data(uint8_t irq_pin, pio_pad *pad, master_config *confi){
+
+        gpio_put(irq_pin, 1);
+            sleep_us(100);
+          send_pio_data(pad, confi);
+        gpio_put(irq_pin, 0);
+
+}
+
+void output_master_mask(uint8_t irq_pin, uint16_t mask, master_config *config){
+          gpio_put(irq_pin, 1);
+            sleep_us(100);
+          mask_master_code(mask, config);
+        gpio_put(irq_pin, 0);
+}
+*/
+%}
+

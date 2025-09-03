@@ -1,0 +1,85 @@
+#ifndef ILI_INIT_COMMAND_PARAMETER_S_H
+#define ILI_INIT_COMMAND_PARAMETER_S_H
+
+ uint8_t init_comms[13] = {
+
+  0xE0,   //  Positive Gamma Control
+  0xE1,   //  Negative Gamma Control
+  0xC0,   //  Power Control O
+  0xC1,   //  Power Control T
+  0xC5,   //  VCOM Control
+  0x36,   //  Mem Acc Control
+  0x3A,   //  Pix Intr Format
+  0xB0,   //  Inter Mode Control
+  0xB1,   //  Frame Rate Control
+  0xB4,   //  Display Inversion
+  0xB6,   //  Display Function Control
+  0x11,   //  Sleep Out
+  0x29,   //  Display On
+
+};
+
+ uint8_t pos_gamma_dat[15] = {
+
+  0x00,
+  0x03,
+  0x09,
+  0x08,
+  0x16,
+  0x0A,
+  0x3F,
+  0x78,
+  0x4C,
+  0x09,
+  0x0A,
+  0x08,
+  0x16,
+  0x1A,
+  0x0F
+
+};
+
+ uint8_t neg_gamma_dat[15] = {
+
+  0x00,
+  0x16,
+  0x19,
+  0x03,
+  0x0F,
+  0x05,
+  0x32,
+  0x45,
+  0x46,
+  0x04,
+  0x0E,
+  0x0D,
+  0x35,
+  0x37,
+  0x0F
+
+};
+
+ uint8_t pwr_con_o[2] = {
+  0x17,
+  0x15
+};
+
+ uint8_t pwr_con_t[1] = {
+  0x41
+};
+
+ uint8_t vcom_ctrl[3] = {
+  0x00,
+  0x12,
+  0x80
+};
+
+ uint8_t display_func_ctrl[3] = {
+  0x02,
+  0x02,
+  0x3B
+};
+
+
+
+#endif

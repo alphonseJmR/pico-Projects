@@ -1,0 +1,523 @@
+.program cdhc_in_register
+
+
+.wrap_target
+init:
+  set pins, 0x07
+
+ready_reg:
+  push NoBlock
+	set X,    0x07
+
+latching:
+  set pins, 0x06
+  set pins, 0x03
+
+read_reg:
+  set pins, 0x01
+	in pins,  1
+  set pins, 0x05
+	jmp x-- read_reg
+
+  mov ISR, :: ISR
+;  in null, 23
+	jmp ready_reg
+
+.wrap
+	
+ 
+% c-sdk {
+#include <stdlib.h>
+// #include "ili_lib/ili_user_config.h"
+#include "../pio_files/rotary_encoder_lib.h"
+#include "hardware/pio.h"
+#include "hardware/gpio.h"
+#include "hardware/dma.h"
+
+// #define number_pads
+#define rotary_inputs
+// #define hall_sensors
+
+#define enable_dma_
+//#define pad_dma_
+#define rot_dma_
+// #define hall_dma_
+
+#define rf_controller_dma
+#define controller_structs
+
+
+
+//  these are our general structs
+typedef struct register_dma_info_s {
+
+  uint8_t channel;
+  bool r_inc;
+  bool w_inc;
+  uint8_t transfer_size;
+
+}reg_dma_info;
+
+// Holds PIO and pins data.
+typedef struct generic_sn74hc165_s {
+  PIO gr_port;
+  uint gr_SM;
+  uint gr_offset;
+  uint8_t input;
+  uint8_t latch;
+  uint8_t clk_inh;
+  uint8_t clk;
+  //  this is the same as reg_return in the reir generic setup
+  volatile  uint32_t reg_ret;
+  uint32_t program_clk_div;
+  bool dma_fired[4];
+  bool cur_dir;
+  uint8_t previous_ret;
+  uint8_t current_ret;
+  int rotation_inc;
+  int rotations;
+}generic_register;
+
+
+
+
+#ifdef controller_structs
+
+  reir controller_rf = {
+  .info = {
+    .re_port = pio0,
+    .re_SM = 0,
+    .re_offset = 0,
+    .input = 0,
+    .latch = 1,
+    .clk_inh = 2,
+    .clk = 3
+  },
+  .reg_return = 0,
+  .pre_re1 = 0,
+  .pre_re2 = 0,
+  .pre_re3 = 0,
+  .re1_v = 0,
+  .re2_v = 0,
+  .re3_v = 0,
+  .delta1 = 1,
+  .delta2 = 2,
+  .delta3 = 5,
+  .switch1 = false,
+  .switch2 = false
+  };
+
+#endif
+
+
+
+#ifdef enable_dma_
+
+//  slang for dma_channel
+// setup one for each channel
+repeating_timer_t dma_c1;  // hall_dma
+repeating_timer_t dma_c2;  // rot_dma
+repeating_timer_t dma_c3;  // pad_dma
+repeating_timer_t dma_c4;  // empty still
+
+// function prototype decleration
+bool dma_fire(repeating_timer_t *rt);
+void setup_dma_timer(repeating_timer_t *rt, uint16_t delay);
+
+
+
+#define rf_controller_dma
+
+reg_dma_info controller_dma = {
+  .channel = 0,
+  .r_inc = false,
+  .w_inc = false,
+  .transfer_size = 8
+};
+
+/*
+// for now we'll assume pio0
+// we'll also assume our read
+// rep = rotary encoder program
+bool rep_dma_fire(repeating_timer_t *rt){
+
+  if(dma_channel_is_busy(controller_dma.channel)){
+  //  printf("DMA Busy\n");
+  // printf("Write to address: 0x%08x.\n", &dma_input.reg_ret);
+  }else{
+    dma_channel_set_read_addr(controller_dma.channel, &pio0->rxf[controller_rf.info.re_SM], false);
+    dma_channel_set_write_addr(controller_dma.channel, &controller_rf.reg_return, false);
+    dma_channel_wait_for_finish_blocking(controller_dma.channel);
+  }
+    
+printf("Reg Result: 0x%04x.\n", controller_rf.reg_return);
+  rotary_gauge(&controller_rf);
+}
+
+
+// setup rotary encoder program
+bool setup_rep_dma_timer(repeating_timer_t *rt, uint16_t delay){
+  if(add_repeating_timer_us(delay, rep_dma_fire, NULL, &dma_c2)){
+    printf("Rotary Encoder Program Dma Timer Setup.\n");
+    return true;
+  }
+  return false;
+}
+*/
+
+//  Setup a DMA with read & write increment disabled, at 32bits, full speed.
+// DMA is not yet enabled!   or it might be?  the get_default_config says it is
+bool setup_rep_dma(reg_dma_info *rdma, reir *result, repeating_timer_t *rt, uint16_t delay){
+
+  rdma->channel = dma_claim_unused_channel(true);
+    printf("\nOur DMA Channel: %i.\n", rdma->channel);
+  dma_channel_config c = dma_channel_get_default_config(rdma->channel);
+  channel_config_set_read_increment(&c, rdma->r_inc);
+  channel_config_set_write_increment(&c, rdma->w_inc);
+//  channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
+  channel_config_set_dreq(&c, DREQ_PIO0_RX0);
+    printf("\nWrite to address: 0x%08x.\n", &result->reg_return);
+    printf("Read from address: 0x%08x.\n\n", (result->info.re_port == pio0) ? &pio0->rxf[result->info.re_SM] : &pio1->rxf[result->info.re_SM]);
+  dma_channel_configure(rdma->channel, &c, &result->reg_return, ((result->info.re_port == pio0) ? &pio0->rxf[result->info.re_SM] : &pio1->rxf[result->info.re_SM]), DMA_SIZE_32, true);
+  channel_config_set_chain_to(&c, rdma->channel);
+    
+  dma_channel_start(controller_dma.channel);
+
+  return true;
+}
+
+#endif
+
+
+
+#ifdef hall_dma_
+
+const uint8_t mot_pos[7] = {0x3F, 0x55, 0x6D, 0x77, 0x7B, 0x7D, 0x7E};
+/*
+// this is just for my readability on which value is what direction
+typedef enum ring_pos {
+  south_east = 0x3F,
+  south = 0x55,
+  south_west = 0x6D,
+  west = 0x77,
+  north_west = 0x7B,
+  north = 0x7D,
+  north_east = 0x7E,
+  east = 0x7F
+};
+*/
+
+//  generic 
+reg_dma_info hall_dma = {
+
+  .channel = 0,
+  .r_inc = false,
+  .w_inc = false,
+  .transfer_size = 8
+
+};
+
+
+// this is our hall effect register info
+generic_register he_sensor = {
+  .gr_port = pio0,
+  .gr_SM = 0,
+  .gr_offset = 0,
+  .input = 4,
+  .latch = 5,
+  .clk_inh = 6,
+  .clk = 7,
+  .reg_ret = 0,
+  .program_clk_div = 1250,
+  .dma_fired = {false, false, false, false},
+  .rotation_inc = 0,
+  .rotations = 0,
+  .cur_dir = false,
+  .previous_ret = 0
+
+};
+
+
+// callback fuction for repeating timer
+// read addr = &pio0->rxf[0]
+// write addr = &dma_input.reg_ret
+
+void determine_rotations(generic_register *reg){
+
+  bool pos_match = false;
+  //  current matched position
+  uint8_t cmp = 0;
+// 0x7F is the intermediate space between sensors
+  if(reg->current_ret != 0x7F){
+    // short loop to find which value matches
+    for(uint8_t a = 0; a < 7; a++){
+      if(reg->current_ret == mot_pos[a]){
+        pos_match = true;
+        // set our current matched pos to a, to bring a outside the scope.
+        cmp = a;
+        break;
+      }
+    }
+  
+  if(pos_match){
+
+      if(cmp == 6){
+
+        if(reg->previous_ret == mot_pos[0]){
+            reg->rotation_inc++;
+        }else if(reg->previous_ret == mot_pos[cmp - 1]){
+          reg->rotation_inc--;
+        }
+
+      }else if(cmp == 0){
+
+        if(reg->previous_ret == mot_pos[6]){
+          reg->rotation_inc--;
+        }else if(reg->previous_ret == mot_pos[cmp + 1]){
+          reg->rotation_inc++;
+        }
+
+      }else {
+        if(reg->previous_ret == mot_pos[cmp - 1]){
+          reg->rotation_inc--;
+        }else if(reg->previous_ret == mot_pos[cmp + 1]){
+          reg->rotation_inc++;
+        }
+      }
+    }
+    reg->previous_ret = reg->current_ret;
+  }
+
+  if(reg->rotation_inc > 6){
+    reg->rotations++;
+    reg->rotation_inc = 0;
+  }else if(reg->rotation_inc < -6){
+    reg->rotations--;
+    reg->rotation_inc = 0;
+  }
+//  printf("Previous Ret: 0x%02x\n", reg->previous_ret);
+
+}
+
+
+// this just copies the value of reg_ret into current ret so we can perform logic on it.
+void set_mrr(generic_register *reg){
+  reg->current_ret = reg->reg_ret;
+//  printf("Current Ret: 0x%02x\n", reg->current_ret);
+  determine_rotations(reg);
+}
+
+// for now we'll assume pio0
+bool hall_dma_fire(repeating_timer_t *rt){
+//printf("timer\n");
+  if(dma_channel_is_busy(hall_dma.channel)){
+  //  printf("DMA Busy\n");
+  // printf("Write to address: 0x%08x.\n", &dma_input.reg_ret);
+  }else{
+    dma_channel_set_read_addr(hall_dma.channel, &pio0->rxf[he_sensor.gr_SM], false);
+    dma_channel_set_write_addr(hall_dma.channel, &he_sensor.reg_ret, false);
+    dma_channel_set_trans_count(hall_dma.channel, 1, true);
+    dma_channel_start(hall_dma.channel);
+  }
+
+  set_mrr(&he_sensor);
+//  printf("0x%08x\n", he_sensor.reg_ret);
+  return true;
+}
+
+
+void setup_hall_dma_timer(repeating_timer_t *rt, uint16_t delay){
+  if(add_repeating_timer_us(delay, hall_dma_fire, NULL, rt)){
+    printf("Hall Dma Timer Setup.\n");
+  }
+}
+
+
+//  Setup a DMA with read & write increment disabled, at 32bits, full speed.
+// DMA is not yet enabled!   or it might be?  the get_default_config says it is
+void setup_hall_dma(reg_dma_info *rdma, generic_register *result, repeating_timer_t *rt, uint16_t delay){
+
+  rdma->channel = dma_claim_unused_channel(true);
+    printf("\nOur DMA Channel: %i.\n", rdma->channel);
+  dma_channel_config c = dma_channel_get_default_config(rdma->channel);
+  channel_config_set_read_increment(&c, rdma->r_inc);
+  channel_config_set_write_increment(&c, rdma->w_inc);
+  channel_config_set_dreq(&c, pio_get_dreq(result->gr_port, result->gr_SM, false));
+    printf("\nWrite to address: 0x%08x.\n", &result->reg_ret);
+    printf("Read from address: 0x%08x.\n\n", (result->gr_port == pio0) ? &pio0->rxf[result->gr_SM] : &pio1->rxf[result->gr_SM]);
+  dma_channel_configure(rdma->channel, &c, &result->reg_ret, ((result->gr_port == pio0) ? &pio0->rxf[result->gr_SM] : &pio1->rxf[result->gr_SM]), 1, false);
+
+  setup_hall_dma_timer(rt, delay);
+}
+
+
+
+#endif
+
+
+
+#ifdef number_pads
+
+typedef struct imp_stat_s {
+
+  volatile bool zero;
+  volatile bool reset;
+  volatile bool enter;
+
+}input_s;
+
+
+typedef struct reg_in_fifo {
+
+  volatile uint32_t f_pull;
+  volatile uint8_t f_return;
+
+}reg_fifo;
+
+
+typedef struct reg_in_pio_s {
+
+  pio_smp pins;
+  pio_pad nums;
+  input_s bools;
+  reg_fifo in_fifo;
+
+}reg_input;
+
+
+// For use with numpad input
+ static inline void numpad_reg_init(ili_pio *p, uint offset, reg_input *input){
+	
+    uint32_t p_mask = ((1 << input->pins.in) | (1 << input->pins.set_one) | (1 << input->pins.set_two) | (1 << input->pins.clk));
+    uint32_t pdir_mask = ((0 << input->pins.in) | (1 << input->pins.set_one) | (1 << input->pins.set_two) | (1 << input->pins.clk));
+    pio_sm_set_pins_with_mask(p->s_pio.r_pio, p->s_pio.r_sm, 0, p_mask);
+    pio_sm_set_pindirs_with_mask(p->s_pio.r_pio, p->s_pio.r_sm, pdir_mask, p_mask);
+    pio_sm_config c = pio_get_default_sm_config();
+    pio_gpio_init(p->s_pio.r_pio, input->pins.in);  			// ex pin 3
+      gpio_pull_up(input->pins.in);
+    pio_gpio_init(p->s_pio.r_pio, input->pins.set_one);  	// ex pin 4
+    pio_gpio_init(p->s_pio.r_pio, input->pins.set_two);  	// ex pin 5
+    pio_gpio_init(p->s_pio.r_pio, input->pins.clk);			// ex pin 6
+    sm_config_set_in_pins(&c, input->pins.in);
+    sm_config_set_set_pins(&c, input->pins.set_one, 3);
+    sm_config_set_in_shift(&c, true, false, 1);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+    sm_config_set_clkdiv(&c, 1250);
+    pio_sm_init(p->s_pio.r_pio, p->s_pio.r_sm, offset, &c);
+
+ }
+
+   void init_cdhc_program(ili_pio *p, reg_input *input){
+    if(add_cdhc_program(p)){
+      register_in_init(p, p->s_pio.r_offset, input);
+      pio_sm_set_enabled(p->s_pio.r_pio, p->s_pio.r_sm, true);
+    }
+  }
+
+#endif
+
+
+#ifdef rotary_inputs
+//  PIO setup for rotary encoder program - first step
+  static inline void rotary_reg_init(reir *generic){
+	
+    uint32_t p_mask = ((1 << generic->info.input) | (1 << generic->info.latch) | (1 << generic->info.clk_inh) | (1 << generic->info.clk));
+      printf("Pin Mask: %hhu\n", p_mask);
+    uint32_t pdir_mask = ((0 << generic->info.input) | (1 << generic->info.latch) | (1 << generic->info.clk_inh) | (1 << generic->info.clk));
+      printf("Pin Direction Mask: %hhu\n", pdir_mask);
+    pio_sm_set_pins_with_mask(generic->info.re_port, generic->info.re_SM, 0, p_mask);
+    pio_sm_set_pindirs_with_mask(generic->info.re_port, generic->info.re_SM, pdir_mask, p_mask);
+    pio_sm_config c = pio_get_default_sm_config();
+      printf("PIO Register Input Pin: %i.\n", generic->info.input);
+    pio_gpio_init(generic->info.re_port, generic->info.input);  			// ex pin 10
+      gpio_pull_up(generic->info.input);
+      printf("PIO Register Latch Pin: %i.\n", generic->info.latch);
+    pio_gpio_init(generic->info.re_port, generic->info.latch);  			// ex pin 11
+      printf("PIO Register Clk Inh Pin: %i.\n", generic->info.clk_inh);
+    pio_gpio_init(generic->info.re_port, generic->info.clk_inh);  			// ex pin 12
+    printf("PIO Register Clk Pin: %i.\n", generic->info.clk);
+    pio_gpio_init(generic->info.re_port, generic->info.clk);				// ex pin 13
+    sm_config_set_in_pins(&c, generic->info.input);
+    sm_config_set_set_pins(&c, generic->info.latch, 3);
+    sm_config_set_in_shift(&c, true, false, 1);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+    sm_config_set_clkdiv(&c, 1250);
+    pio_sm_init(generic->info.re_port, generic->info.re_SM, generic->info.re_offset, &c);
+
+ }
+
+//  PIO program rotary encoder add check - second step
+  bool add_cdhc_rotary_program(reir *generic){
+    bool status = false;
+    status = pio_can_add_program(generic->info.re_port, &cdhc_in_register_program);
+      printf("Register: Rotary - Status: %s.\n", (status ? "Available" : "Not Available"));
+    if(status){
+      generic->info.re_offset = pio_add_program(generic->info.re_port, &cdhc_in_register_program);
+    }
+    return status;
+  }
+
+//  PIO program rotary encoder main INIT - final step
+  void init_rotary_encoder_program(reir *generic){
+    if(add_cdhc_rotary_program(generic)){
+      rotary_reg_init(generic);
+      pio_sm_set_enabled(generic->info.re_port, generic->info.re_SM, true);
+    }
+  }
+#endif
+
+
+#ifdef hall_sensors
+
+ //  PIO setup for hall sensor program - first step
+  static inline void he_sensor_reg_init(generic_register *reg){
+	
+    uint32_t p_mask = ((1 << reg->input) | (1 << reg->latch) | (1 << reg->clk_inh) | (1 << reg->clk));
+      printf("Pin Mask: %hhu\n", p_mask);
+    uint32_t pdir_mask = ((0 << reg->input) | (1 << reg->latch) | (1 << reg->clk_inh) | (1 << reg->clk));
+      printf("Pin Direction Mask: %hhu\n", pdir_mask);
+    pio_sm_set_pins_with_mask(reg->gr_port, reg->gr_SM, 0, p_mask);
+    pio_sm_set_pindirs_with_mask(reg->gr_port, reg->gr_SM, pdir_mask, p_mask);
+    pio_sm_config c = pio_get_default_sm_config();
+      printf("PIO Register Input Pin: %i.\n", reg->input);
+    pio_gpio_init(reg->gr_port, reg->input);  			// ex pin 10
+      gpio_pull_up(reg->input);
+      printf("PIO Register Latch Pin: %i.\n", reg->latch);
+    pio_gpio_init(reg->gr_port, reg->latch);  			// ex pin 11
+      printf("PIO Register Clk Inh Pin: %i.\n", reg->clk_inh);
+    pio_gpio_init(reg->gr_port, reg->clk_inh);  			// ex pin 12
+    printf("PIO Register Clk Pin: %i.\n", reg->clk);
+    pio_gpio_init(reg->gr_port, reg->clk);				// ex pin 13
+    sm_config_set_in_pins(&c, reg->input);
+    sm_config_set_set_pins(&c, reg->latch, 3);
+    sm_config_set_in_shift(&c, true, false, 1);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_NONE);
+    sm_config_set_clkdiv(&c, reg->program_clk_div);
+    pio_sm_init(reg->gr_port, reg->gr_SM, reg->gr_offset, &c);
+
+ }
+
+
+ //  PIO program hall effect add check - second step
+  bool add_cdhc_he_program(generic_register *reg){
+    bool status = false;
+    status = pio_can_add_program(reg->gr_port, &cdhc_in_register_program);
+      printf("Register: Hall Effect - Status: %s.\n", (status ? "Available" : "Not Available"));
+    if(status){
+      reg->gr_offset = pio_add_program(reg->gr_port, &cdhc_in_register_program);
+    }
+    return status;
+  }
+
+  //  PIO program hall effect sensor main INIT - final step
+  void init_he_sensor_program(generic_register *reg){
+    if(add_cdhc_he_program(reg)){
+      he_sensor_reg_init(reg);
+      pio_sm_set_enabled(reg->gr_port, reg->gr_SM, true);
+    }
+  }
+
+#endif
+
+
+%}

@@ -1,0 +1,40 @@
+Controller Revision 4 Pin Diagram:
+
+Pins + component + signal name
+
+//	ROTARY ENCODER INPUT
+pico 0 - 74165 - Data
+pico 1 - 74165 - sh/ld
+pico 2 - 74165 - clk/inh
+pico 3 - 74165 - clk
+		 74165 - G - Rotary encoder 2 button
+		 74165 - H - Rotary encoder 1 button
+
+
+// these are program selection
+pico 6 - dip switch - in 1  // rc car
+pico 7 - dip switch - in 2	//	ball turret
+pico 8 - dip switch - in 3	//   robit arm
+pico 9 - dip switch - in 4	// 	  nothing yet
+
+//	NRF pins
+pico 11 - nrf24l01 - CE
+pico 12 - nrf24l01 - MISO
+pico 13 - nrf24l01 - CSN
+pico 14 - nrf24l01 - SCK
+pico 15 - nrf24l01 - MOSI
+
+
+// lcd screen
+pico 16 - 2004a lcd - data 7
+pico 17 - 2004a lcd - data 6
+pico 18 - 2004a lcd - data 5
+pico 19 - 2004a lcd - data 4
+pico 20 - 2004a lcd - RS
+pico 21 - 2004a lcd - EN
+lcd led ground goes to switchable resistance
+
+pico 26 - adc0 - vertical stick input
+pico 27 - adc1 - horizontial stick input
+pico 28 - adc2 - (future battery monitor)
+

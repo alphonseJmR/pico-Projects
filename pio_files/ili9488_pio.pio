@@ -1,0 +1,211 @@
+.program ili9488_command
+
+.wrap_target
+
+start:
+  ;  wait 1 gpio 5
+    pull block
+    out null, 24
+    set X, 7
+    jmp pin, start_param
+
+    set pins, 0x02        
+send_command:
+    set pins, 0x00           ;    aka D/CX stable, put clk low.
+    out pins, 1
+    set pins, 0x01           ;    aka D/CX stable, put clk high.
+    jmp x--, send_command    ;    send output by one, eight times.
+    set pins, 0x02
+    jmp start
+
+start_param:
+    set pins, 0x00        
+send_param:
+    set pins, 0x02           ;    aka D/CX stable, put clk low
+    out pins, 1
+    set pins, 0x03           ;    aka D/CX stable, put clk high
+    jmp x--, send_param      ;    send output by one, eight times
+    set pins, 0x00
+    jmp start
+
+.wrap
+
+
+% c-sdk {
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <time.h>
+    #include <stdint.h>
+    #include "hardware/pio.h"
+    #include "hardware/gpio.h"
+    #include "cdhc_in.pio.h"
+    #include "ili_lib/ili9488_functions.h"
+    #include "ili_lib/ili_user_config.h"
+
+
+#define size(a) (size_t)(sizeof(a) / sizeof(a[0]))
+
+// #define cr_size(a,b)    (uint16_t)( (a << 8) | (a+b) )
+
+
+//  max chars is based on 'W' spaced 11, in portriat.
+#define max_x_chars 29
+
+//  This function also allocates the cpu gpio pins csx and reset, and inits them.
+static inline void ili9488_pio_com_init(ili_pio *p){
+        
+        pio_sm_config default_c = pio_get_default_sm_config();
+        pio_sm_set_consecutive_pindirs(p->s_pio.c_pio, p->s_pio.c_sm, p->s_pins.data, 3, true);
+        
+        for(uint8_t a = p->s_pins.data; a <= p->s_pins.dc_rs; a++){
+            printf("Initializing Command PIO Pin: %i.\n", a);
+            pio_gpio_init(p->s_pio.c_pio, a);
+        }
+            printf("\n\n");
+
+        gpio_init(p->s_pins.csx);
+        gpio_set_dir(p->s_pins.csx, GPIO_OUT);
+
+        gpio_init(p->s_pins.reset);
+        gpio_set_dir(p->s_pins.reset, GPIO_OUT);
+
+        gpio_init(p->s_pins.wait);
+        gpio_set_dir(p->s_pins.wait, GPIO_OUT);
+
+        sm_config_set_out_pins(&default_c, p->s_pins.data, 1);
+        sm_config_set_set_pins(&default_c, p->s_pins.clock, 2);
+        sm_config_set_jmp_pin(&default_c, p->s_pins.reg_s);
+        sm_config_set_out_shift(&default_c, false, false, 1);
+        sm_config_set_fifo_join(&default_c, PIO_FIFO_JOIN_NONE);
+        sm_config_set_clkdiv(&default_c, 4);
+        pio_sm_init(p->s_pio.c_pio, p->s_pio.c_sm, p->s_pio.c_offset, &default_c);
+
+    }
+
+
+//  Return true if both ili9488 programs can be added.
+bool add_ili9488_program(ili_pio *p){
+
+    p->s_pio.c_addable = false;
+    p->s_pio.c_addable = pio_can_add_program(p->s_pio.c_pio, &ili9488_command_program);
+        printf("Command Program: %c.\n", (p->s_pio.c_addable ? 'Y' : 'N'));
+    if(p->s_pio.c_addable){
+        p->s_pio.c_offset = pio_add_program(p->s_pio.c_pio, &ili9488_command_program);
+    }
+    return (p->s_pio.c_addable);
+
+}
+
+
+//  Checks if ili9488 programs can be added, if true, inits and enables them.
+void init_ili9488_program(ili_pio *p){
+
+    if(add_ili9488_program(p)){
+
+    gpio_init(p->s_pins.reg_s);
+    gpio_set_dir(p->s_pins.reg_s, GPIO_OUT);
+
+        ili9488_pio_com_init(p);
+        set_wait(p, false);
+
+        pio_sm_set_enabled(p->s_pio.c_pio, p->s_pio.c_sm, true);
+
+        set_reset(p, true);
+            sleep_ms(100);
+        set_reset(p, false);
+            sleep_ms(100);
+        set_reset(p, true);
+            sleep_ms(150);
+        // add display inital setup function here.
+    }else{
+        printf("\nError loading ili9488 PIO programs.\n\n");
+    }
+}
+
+
+void create_param_sizes(param_sizes *nos){
+    printf("\tCreating Parameter Size Struct.\n");
+
+    nos->pgd = size(pos_gamma_dat);
+        printf("Size of PGD: %i.\n", nos->pgd);
+    nos->ngd = size(neg_gamma_dat);
+        printf("Size of NGD: %i.\n", nos->ngd);
+    nos->pco = size(pwr_con_o);
+        printf("Size of PCO: %i.\n", nos->pco);
+    nos->pct = size(pwr_con_t);
+        printf("Size of PCT: %i.\n", nos->pct);
+    nos->vcc = size(vcom_ctrl);
+        printf("Size of VCC: %i.\n", nos->vcc);
+    nos->dfc = size(display_func_ctrl);
+        printf("Size of DFC: %i.\n", nos->dfc);
+
+}
+
+
+// Send all ili initialize setup commands.
+//  currently rewriting from ili_functions.h
+void initialize_ili9488(ili_pio *p, param_sizes *nos){
+    printf("Initializing ILI9488 Screen Now.\n\n");
+
+    create_param_sizes(nos);
+        printf("Init 1__\n");
+    ili_comparm(p, 0xB0, 0x80);
+        printf("Init 2__\n");
+    ili_comparm(p, 0x3A, 0x06);
+        printf("Init 3__\n");
+    ili_comparm_x(p, 0xE0, pos_gamma_dat, nos->pgd);
+        printf("Init 4__\n");
+    ili_comparm_x(p, 0xE1, neg_gamma_dat, nos->ngd);
+        printf("Init 5__\n");
+    ili_comparm_x(p, 0xC0, pwr_con_o, nos->pco);
+        printf("Init 6__\n");
+    ili_comparm_x(p, 0xC1, pwr_con_t, nos->pct);
+        printf("Init 7__\n");
+    ili_comparm_x(p, 0xC5, vcom_ctrl, nos->vcc);
+        printf("Init 8__\n");
+        //	previous 0x36 parm was 0xE8 (this is vertical refresh order)
+    ili_comparm(p, 0x36, 0xB8);
+        printf("Init 8.5__\n");
+    ili_send_command(p, 0x34);
+        printf("Init 9__\n");
+    ili_comparm_dual(p, 0xB1, 0xA0, 0x11);
+        printf("Init 10__\n");        
+    ili_comparm(p, 0xB4, 0x02);
+        printf("Init 11__\n");
+    ili_comparm_x(p, 0xB6, display_func_ctrl, nos->dfc);
+        printf("Init 12__\n");
+    ili_send_command(p, 0x11);
+        printf("Init 13__\n");
+            sleep_ms(200);
+        printf("Init 14__\n");
+    ili_send_command(p, 0x29);
+            sleep_ms(200);
+        printf("Init 15__\n");
+    ili_send_command(p, 0x34);
+            sleep_ms(200);
+
+}
+
+
+void setup_pio(ili_pio *p, reg_input *pins, param_sizes *known){
+  init_ili9488_program(p);
+  init_cdhc_program(p, pins);
+  initialize_ili9488(p, known);
+    //  Set LCD Brightness
+  uint32_t pix_clr = 0x00000000;
+  ili_comparm(p, 0x51, 0xF4);
+    sleep_ms(50);
+}
+
+
+void setup_ILI_pio(ili_pio *p, param_sizes *knowns){
+    init_ili9488_program(p);
+    initialize_ili9488(p, knowns);
+
+    uint32_t pix_color = 0x00000000;
+    ili_comparm(p, 0x51, 0xF4);
+        sleep_ms(50);
+}
+
+%}

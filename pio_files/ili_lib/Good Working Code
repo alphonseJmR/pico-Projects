@@ -1,0 +1,33 @@
+//  Helper function to shorten code, set column data from ili_pix_pos
+void ili_set_column(ili_pio *p, ili_pix_pos *ppos){
+    
+    set_csx(p, 0);
+        ili_command(p, 0x2A);
+        ili_param(p, ppos->xssu);
+        ili_param(p, ppos->xssl);
+        ili_param(p, ppos->xesu);
+        ili_param(p, ppos->xesl);
+    set_csx(p, 1);
+        
+}
+
+
+//  Helper function to shorten code, set row data from ili_pix_pos
+void ili_set_row(ili_pio *p, ili_pix_pos *ppos){
+    
+    set_csx(p, 0);
+        ili_command(p, 0x2B);
+        ili_param(p, ppos->yssu);
+        ili_param(p, ppos->yssl);
+        ili_param(p, ppos->yesu);
+        ili_param(p, ppos->yesl);
+    set_csx(p, 1);
+        
+}
+
+
+//  Sets COL & ROW Start Pos
+void ili_set_pixel_pos(ili_pio *p, ili_pix_pos *t_pps){
+    ili_set_column(p, t_pps);
+    ili_set_row(p, t_pps);
+}

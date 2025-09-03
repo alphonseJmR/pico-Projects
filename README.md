@@ -1,6 +1,6 @@
 # Pico-Projects:  _Current Focus:_ **RC Controller & RC Receiver**
 
-(Currently in process of editing)
+# (Currently in process of editing) - 9/3/2025
 
 ## Folders:
  * pico-Projects_main->
@@ -15,7 +15,7 @@
    
  * Partial Projects-->
   1. 2004A_screen
-  2. 9488_screen
+  2. 9488_screen -- This PIO driver has been completed.  Two projects made from it.
   3. RC_CONTROLLER_PROGRAM
   4. RC_RECIEVER_PROGRAM
     

@@ -4,14 +4,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "pico/stdlib.h"
-#include "hardware/i2c.h"
+//#include "hardware/i2c.h"
 #include "hardware/adc.h"
 #include "hardware/dma.h"
 #include "hardware/pwm.h"
-#include "hardware/spi.h"
+//#include "hardware/spi.h"
 
 #define pin uint8_t
 #define timed uint32_t
+
 
 const uint32_t *adc0_initial_value[] = {
   0x00000000, 0x00000000, 0x00000000, 0x00000000,
@@ -22,7 +23,7 @@ const uint16_t *mult_adc_initial_value[] = {
   0x00000000, 0x00000000, 0x00000000, 0x00000000,
 };
 
-
+/*
 //  Define I2C struct here
 typedef struct i2c_communication_s {
     // "Required" pins first
@@ -81,6 +82,29 @@ typedef struct spi_communication_s {
     uint8_t f_stat;
 
 }spi_com;
+*/
+
+typedef struct rotary_input_s {
+
+  //  rot_X_inc are the values we set for each encoders increment value.
+  int8_t rot_a_inc;
+  int8_t rot_b_inc;
+  int8_t rot_c_inc;
+  // shortened name: Fifo return
+  volatile uint32_t fr[1];
+  volatile uint32_t frr;
+  volatile uint8_t bux_state;
+  volatile int16_t pr1;
+  volatile int16_t pr2;
+  volatile int16_t pr3;
+  volatile int16_t r1;
+  volatile int16_t r2;
+  volatile int16_t r3;
+  volatile bool r1_b;
+  volatile bool r2_b;
+  volatile bool r3_b;
+
+}pio_rot;
 
 typedef struct payload_data_s {
 
@@ -139,6 +163,7 @@ typedef struct payload_data_s {
 
 }payload_data;
 
+/*
 typedef struct split_payload_parity_s {
 
 uint16_t v_par_one;
@@ -150,7 +175,7 @@ uint16_t h_par_two;
 uint16_t h_par_three;
 
 }load_parity;
-
+*/
 
 typedef struct rc_pwm_port_s {
 
@@ -172,6 +197,7 @@ typedef struct {
 } register_pins;
 register_pins reg_pins;
 
+
 typedef struct lcd_register_pin_s {
   
   const uint8_t lcd_reg_data;
@@ -182,6 +208,7 @@ typedef struct lcd_register_pin_s {
   const uint8_t lcd_e;
 
 }register_lcd;
+
 
 typedef struct {
   uint8_t register_value_zero;
@@ -194,6 +221,7 @@ typedef struct {
   uint8_t register_value_seven;
 } uint8_variables;
 uint8_variables u_vars;
+
 
 typedef struct turret_laser_s {
     
@@ -218,6 +246,7 @@ typedef struct register_595_pin_s {
 
 } registered_pins;
 
+
 typedef struct lcd_line_data
 {
 
@@ -227,6 +256,7 @@ typedef struct lcd_line_data
   char line_four[20];
 
 } lcd_lines;
+
 
 typedef struct hc_sr04_t {
 
@@ -327,94 +357,40 @@ typedef struct servo_motor_configuration_s {
 
 }servo_motor;
 
+// Singular Instance of an ADC pin.
+typedef struct ADC_Instance_s {
 
-typedef struct {
-  uint adc0_pin;
-  uint adc1_pin;
-  uint adc2_pin;
-  uint16_t adc0_raw_read;
-  uint16_t adc1_raw_read;
-  uint16_t adc2_raw_read;
-  uint16_t adc0_min_in_map_value;
-  uint16_t adc0_max_in_map_value;
-  uint16_t adc1_min_in_map_value;
-  uint16_t adc1_max_in_map_value;
-  uint16_t adc2_min_in_map_value;
-  uint16_t adc2_max_in_map_value;
-  uint16_t adc0_min_out_map_value;
-  uint16_t adc0_max_out_map_value;
-  uint16_t adc1_min_out_map_value;
-  uint16_t adc1_max_out_map_value;
-  uint16_t adc2_min_out_map_value;
-  uint16_t adc2_max_out_map_value;
-  uint16_t adc0_mapped_value;
-  uint16_t adc1_mapped_value;
-  uint16_t adc2_mapped_value;
-  float adc0_mapped_float;
-  float adc1_mapped_float;
-  float adc2_mapped_float;
+  uint8_t adc_instance;
+  //  pin num duh
+  uint8_t pinum;
+  uint16_t mapped;
+  //  minimum in
+  uint16_t miin;
+  //  maximum in
+  uint16_t main;
+  //  minimum out
+  uint16_t miout;
+  //  maximum out
+  uint16_t maout;
+  // we should be sampling and averagering them.
+  uint16_t raw[32];
+  uint16_t raw_avg;
 
-} adc_port_values;
-adc_port_values pico_adc;
+}ADC_Instance;
 
 
-//  This union type can be used to transform variable size from a FIFO read
-//  Remember cuser, These all share the same memory location, with the largest size being the base (in our case it's the uint32_t)
-//  If memory dependant, remember to allocate the correct size!
-//  Union name is vus_instance *my_instance* <- example
-typedef union variable_unsigned_size_s {
+//  There are THREE ADC pins, and we have three adc objs, but the adc_instance start at zero
+typedef struct ADC_Obj_s {
 
-  uint32_t a;   
-  uint16_t b[2];
-  uint8_t  c[4];
+  ADC_Instance ADC_1;
+  ADC_Instance ADC_2;
+  ADC_Instance ADC_3;
+  //  These bool will be set upon activation pin setup.
+  bool adc1_status;
+  bool adc2_status;
+  bool adc3_status;
 
-}vus_instance;
-
-//  This union can be used for signed int's
-typedef union variable_signed_size_s {
-
-  int32_t a;
-  int16_t b[2];
-  int8_t  c[4];
-
-}sv_instance;
-
-//  We create three instances of variable_unsinged_size_s, one for each adc port variable
-//  This way, each has it's own memory location, and we can use any of the internal union types
-vus_instance my_adc0;
-vus_instance my_adc1;
-vus_instance my_adc2;
-
-
-typedef struct adc_dma_data_s {
-
-  uint adc0_chan;
-  uint adc1_chan;
-  uint adc2_chan;
-
-  uint32_t adc0_dma_stored[8];
-  uint32_t adc1_dma_stored[8];
-  uint32_t adc2_dma_stored[8];
-
-}adc_dma;
-
-
-adc_dma input_adc = {
-
-  .adc0_chan = 0,
-  .adc1_chan = 0,
-  .adc2_chan = 0,
-  .adc0_dma_stored = {                              //  For simplicity, we can initialize these to zero.
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  },
-  .adc1_dma_stored = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  },
-  .adc2_dma_stored = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-  }
-
-};
+}ADC;
 
 
 typedef struct input_type_s {
@@ -471,35 +447,6 @@ typedef struct input_type_s {
 }input_types;
 
 
-typedef struct nrf_timing_s {
-
-  uint32_t nrf_total_transmit_time;
-  uint32_t nrf_start_transmit;
-  uint32_t nrf_end_transmit;
-  uint32_t nrf_average_transmit_time[100];
-  uint32_t nrf_average_total_transmit[100];
-
-  //  nrf average transmit time
-  size_t natt_t;  
-  //  Nrf Average Total Transmit
-  size_t n_attt;
-
-  uint16_t arr_inc;
-
-}nrf_time;
-
-typedef struct _function_timer_test_s {
-
-  uint32_t _average_buffer;
-  uint32_t  _total_function_time;
-  uint32_t  _function_start;
-  uint32_t  _function_end;
-  uint32_t  _function_average[100];
-  size_t    _fun_avg_size;
-  uint16_t  _functor_inc;
-
-}function_time;
-
 typedef struct core0_variables {
 
   volatile bool fifo_out_ready;
@@ -539,43 +486,7 @@ size_t three_size;
 
 }pay_size;
 
-typedef struct nrf_connection_status_s {
-    
-  uint8_t initial_loop;
-  uint8_t NCS;  //  No Connections
-  uint8_t RAN;  //  Restart Attempt Nums
-  uint16_t s_vert_value;
-  uint16_t s_hori_value;
-  bool reset;
 
-} nrf_status;
-
-typedef struct nrf_verification_var_s {
-
-  bool nrf_initial_bypass;
-  bool reset_nrf;
-  uint8_t transmit_NCS;
-  uint8_t transmit_RAN;
-  uint32_t pkt_tx_time;
-  uint32_t pkt_rx_time;
-
-}nrf_verify;
-
-typedef struct setup_nrf_s {
-
-volatile bool nrf_setup_complete;
-volatile bool channel_complete;
-volatile bool data_rate_complete;
-volatile bool power_complete;
-uint8_t setting_val;
-uint8_t prev_val;
-char top_line[16];
-char bottom_line[16];
-uint8_t channel_set;
-uint8_t data_set;
-uint8_t power_set;
-
-}nrf_setup;
 
 
 #endif

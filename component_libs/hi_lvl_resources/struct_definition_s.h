@@ -5,17 +5,6 @@
 #include "../Periphereals/resources/pico_pin_enum.h"
 
 
-function_time motor_time = {
-
-  ._average_buffer = 0,
-  ._total_function_time = 0,
-  ._function_start = 0,
-  ._function_end = 0,
-  ._fun_avg_size = 0,
-  ._functor_inc = 0
-
-};
-
 input_types my_types = {
 
   .r_en = {
@@ -37,13 +26,6 @@ input_types my_types = {
 };
 
 
-nrf_time my_timing = {
-  .nrf_total_transmit_time = 0,
-  .nrf_start_transmit = 0,
-  .nrf_end_transmit = 0,
-  .arr_inc = 0
-};
-
 servo_motor my_servo = {
 
   .my_perv.servo_pin_one = GPIO_TWENTY,
@@ -55,6 +37,7 @@ servo_motor my_servo = {
   .my_serv.servo_middle_ground = (146 * 10)
 
 };
+
 
 dc_motor my_dc = {
 
@@ -83,6 +66,7 @@ c0_var my_core0 = {
 
 };
 
+
 pre_calcs received_calcs = {
   
   .wrap_val_buffered = 0,
@@ -90,6 +74,7 @@ pre_calcs received_calcs = {
   .servo_val_buffed = 0
 
 };
+
 
 c1_vars my_core = {
     
@@ -101,6 +86,7 @@ c1_vars my_core = {
 
 };
 
+
 pre_calcs my_pres ={
 
   .wrap_val_buffered = 0,
@@ -111,18 +97,6 @@ pre_calcs my_pres ={
 };
 
 
-
-nrf_status my_nrf_con = {
-
-  .initial_loop = 1,
-  .NCS = 0,
-  .RAN = 0,
-  .reset = false,
-  .s_vert_value = 0,
-  .s_hori_value = 0
-
-};
-
 pay_size my_load_size = {
 
   .zero_size = 0,
@@ -131,6 +105,7 @@ pay_size my_load_size = {
   .three_size = 0
 
 };
+
 
 payload_data my_loads = {
 
@@ -158,6 +133,7 @@ payload_data my_loads = {
 
 };
 
+
 payload_data turret_load = {
 
   .ready_load.load_duty_data.upper_duty = 0,
@@ -184,6 +160,40 @@ payload_data turret_load = {
 
 };
 
+
+ADC ADC_Default_Config = {
+  .ADC_1 = {
+    .adc_instance = 0,
+    .pinum = GPIO_TWENTY_SIX,
+    .raw = 0,
+    .mapped = 0,
+    .miin = 0,
+    .main = 4096,
+    .miout = 0,
+    .maout = 1024
+  },
+  .ADC_2 = {
+    .adc_instance = 1,
+    .pinum = GPIO_TWENTY_SEVEN,
+    .raw = 0,
+    .mapped = 0,
+    .miin = 0,
+    .main = 4096,
+    .miout = 0,
+    .maout = 1024
+  },
+  .ADC_3 = {
+    .adc_instance = 2,
+    .pinum = GPIO_TWENTY_EIGHT,
+    .raw = 0,
+    .mapped = 0,
+    .miin = 0,
+    .main = 4096,
+    .miout = 0,
+    .maout = 1024
+  }
+};
+/*
 adc_port_values my_adc = {
     .adc0_pin = GPIO_TWENTY_SIX,
     .adc1_pin = GPIO_TWENTY_SEVEN,
@@ -241,6 +251,34 @@ adc_port_values turret_adc = {
   
 };
 
+
+adc_port_values pivot_adc = {
+  .adc0_pin = UNDEFINED,
+  .adc1_pin = GPIO_TWENTY_SEVEN,
+  .adc2_pin = GPIO_TWENTY_EIGHT,
+  .adc0_raw_read = 0,
+  .adc1_raw_read = 0,
+  .adc2_raw_read = 0,
+  .adc0_min_in_map_value = 0,
+  .adc0_max_in_map_value = 0,
+  .adc1_min_in_map_value = 0,
+  .adc1_max_in_map_value = 4096,
+  .adc2_min_in_map_value = 0,
+  .adc2_max_in_map_value = 4096,
+  .adc0_min_out_map_value = 0,
+  .adc0_max_out_map_value = 0,
+  .adc1_min_out_map_value = 0,
+  .adc1_max_out_map_value = 255,
+  .adc2_min_out_map_value = 0,
+  .adc2_max_out_map_value = 255,
+  .adc0_mapped_value = 0,
+  .adc1_mapped_value = 0,
+  .adc2_mapped_value = 0,
+  
+};
+
+*/
+
 input_types turret_buttons = {
 
   .t_buttons = {
@@ -250,19 +288,5 @@ input_types turret_buttons = {
 
 };
 
-nrf_setup controller_init = {
-
-.nrf_setup_complete = false,
-.channel_complete = false,
-.data_rate_complete = false,
-.power_complete = false,
-.setting_val = 0,
-.top_line = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
-.bottom_line = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
-.channel_set = 0,
-.data_set = 0,
-.power_set = 0
-
-};
 
 #endif

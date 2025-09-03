@@ -6,7 +6,9 @@
 
 
 // #define _RC_CAR_SERVO_
-#define _SG90_SERVO_
+// #define _SG90_SERVO_
+// #define _NEMA_17_SERVO_
+#define _GENERIC_SERVO_
 
 #include <stdio.h>
 #include <stdint.h>
@@ -231,6 +233,7 @@ uint16_t set_servo_turn(servo_motor *servo, volatile uint16_t horizontal_data, u
 
 #endif
 
+
 #ifdef _SG90_SERVO_
 
 //  Pulse sizes as defined by datasheet.
@@ -252,21 +255,21 @@ uint16_t ctp;
   Inputted into ((x/20000)*39062)
 */
 const uint16_t turn_values[17] = {
-781,  
+781,  // 1
 976,
-1171,
+1171, // 2
 1367,
 1562, //  min turret position
 1757,
-1953,
+1953, //4
 2148,
 2343, //  center position
 2539,
-2734,
+2734, //6
 2929,
 3124, //  max turret position
 3320,
-3515,
+3515, //8 
 3710,
 3906
 };
@@ -301,9 +304,9 @@ const uint16_t tta[9] = {
 typedef struct sg90_servo_s {
 
 pin signal;  // This is the output pin.
-const position center;
-position min;
-position max;
+const position center;  //  going with 2343?
+position min; //  1562
+position max; //  3124
 
 float clk_div;        //  For SG90 we'll set this as 64.f
 uint16_t period_div;  //  This will be set to 39062
@@ -454,6 +457,125 @@ void swivel_turret(sg90 *swivel, uint16_t input){
   }
 }
 
+
+#endif
+
+
+#ifdef _NEMA_17_SERVO_
+
+typedef struct nema17_pin_s {
+
+  uint8_t step;
+  uint8_t dir;
+  uint8_t fault;
+
+}nema_pins;
+
+//  Struct Insts
+
+// This is my base driver (for name simplicity sake)
+nema_pins driver;
+//  To check drv8825 fault line
+repeating_timer_t fault_check;
+
+
+nema_pins set_driver_pins(nema_pins *in, uint8_t step, uint8_t direction, uint8_t fault){
+
+  in->step = step;
+  in->dir = direction;
+  in->fault = fault;
+
+  return *in;
+
+}
+
+#endif
+
+
+#ifdef _GENERIC_SERVO_
+
+typedef struct generic_servo_s {
+  uint8_t signal_pin;
+  uint8_t pwm_slice;
+  uint8_t pwm_chan;
+  uint16_t center_pos;
+  uint16_t min_pos;
+  uint16_t max_pos;
+  float clk_div;
+  float duty_cycle;
+}gen_servo;
+
+//  Helper function to set motor back to center pos
+void center_servo(gen_servo *motor){
+
+    printf("\n\tCentering Servo Motor.\n");
+  pwm_set_gpio_level(motor->signal_pin, motor->center_pos);
+    printf("\tServo Centered.\n\n");
+}
+
+//  Helper function to set servo motor.
+void set_servo_pos(gen_servo *motor, uint16_t pos){
+    
+  if((pos <= motor->max_pos) && (pos >= motor->min_pos)){
+      printf("\n\tSetting Servo at %i.\n", pos);
+    pwm_set_gpio_level(motor->signal_pin, pos);
+      printf("\tServo at %i.\n\n", pos);
+  }else{
+      printf("\n\tServo input out of range.  Centering.\n");
+    center_servo(motor);
+      printf("\tServo at %i.\n\n", motor->center_pos);
+  }
+}
+
+
+/*! \brief
+  Initialise SG90 Servo Motor.
+
+  *\param setup Struct containing servo variables
+  
+  \note 
+    Sets up:
+  \note
+    Pin Function
+  \note
+    Slice Num
+  \note
+    Clk Div
+  \note
+    Wrap
+*/
+void initialize_servo(gen_servo *setup){
+  //  default config, then we adjust
+  pwm_config config = pwm_get_default_config();
+
+    printf("Initializing Servo Pin: %i.\n", setup->signal_pin);
+  gpio_set_function(setup->signal_pin, GPIO_FUNC_PWM);
+  setup->pwm_slice = pwm_gpio_to_slice_num(setup->signal_pin);
+  pwm_config_set_clkdiv(&config, setup->clk_div);
+  pwm_config_set_wrap(&config, setup->duty_cycle);
+
+  pwm_init(setup->pwm_slice, &config, true);
+    center_servo(setup);
+  printf("SG90 Servo Motor Initialized.\n");
+}
+
+
+//  Helper function to remember to initialize the servo pos.
+void init_servo_pos(gen_servo *motor, uint16_t initial_pos){
+  set_servo_pos(motor, initial_pos);
+}
+
+/*
+// generic setup
+  gen_servo generic_setup = {
+  .signal_pin = 6,
+  .center_pos = 2343,
+  .min_pos = 1560,
+  .max_pos = 3150,
+  .clk_div = 64.f,
+  .period_div = 39062
+  }
+*/
 
 #endif
 

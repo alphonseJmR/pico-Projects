@@ -5,11 +5,11 @@
 #include <stdint.h>
 #include "pico/stdlib.h"
 #include "pico/time.h"
-#include "pico/multicore.h"
+#include "hardware/pwm.h"
 #include "hardware/gpio.h"
 #define gpin uint8_t
 
-
+/*
 volatile uint32_t fifo_buffer;
 
 bool fifo_pop(void){
@@ -27,10 +27,11 @@ bool fifo_pop(void){
 void fifo_res(void){
   multicore_fifo_push_blocking(0x00);
 }
-
+*/
 
 //  Select stepper_motor to use.
-#define _28bjy_48
+// #define _28bjy_48
+#define _nema_17
 
 
 #ifdef _28bjy_48
@@ -111,6 +112,82 @@ typedef struct _28bjy_48_stepper {
 
 }bjy48;
 
+
+typedef struct _42_bygh_23_stepper_s {
+
+    gpin coil_a_pos;
+    gpin coil_a_neg;
+    gpin coil_b_pos;
+    gpin coil_b_neg;
+
+    bool position_reset;
+
+    int16_t current_rotations;
+    uint16_t const_delay_speed; //  Used to pass to sleep_ms() to set motor delay speed.
+    int32_t current_num_steps; //  Keep track of the number of steps taken to guage again max_rotations or minimum.
+    int16_t max_rotations;     //  For setting a maximum number of rotations in the defined system.
+
+}bygh_s;
+
+
+void nema_motor_init(bygh_s *nema){
+
+        printf("Initializing NEMA Coil Pins.\n");
+    gpio_init(nema->coil_a_pos);
+    gpio_init(nema->coil_a_neg);
+    gpio_init(nema->coil_b_pos);
+    gpio_init(nema->coil_b_neg);
+    
+        printf("Setting Pin Direction: OUT.\n");
+    gpio_set_dir(nema->coil_a_pos, GPIO_OUT);
+    gpio_set_dir(nema->coil_a_neg, GPIO_OUT);
+    gpio_set_dir(nema->coil_b_pos, GPIO_OUT);
+    gpio_set_dir(nema->coil_b_neg, GPIO_OUT);
+
+    printf("GPIO Pins Initialized.\n");
+}
+
+
+void set_coil_A(bygh_s *nema, bool pol, bool dir){
+    if(pol){
+        gpio_put(nema->coil_a_pos, dir);
+    }else{
+        gpio_put(nema->coil_a_neg, dir);
+    }
+}
+
+
+void set_coil_B(bygh_s *nema, bool pol, bool dir){
+    if(pol){
+        gpio_put(nema->coil_b_pos, dir);
+    }else{
+        gpio_put(nema->coil_b_neg, dir);
+    }
+}
+
+
+void test_dir_fire(bygh_s *nema){
+
+    set_coil_A(nema, 1, 1);
+    set_coil_B(nema, 1, 1);
+        sleep_us(nema->const_delay_speed);
+    set_coil_A(nema, 1, 0);
+    set_coil_B(nema, 1, 0);
+    nema->current_num_steps++;
+}
+
+
+void x_steps(bygh_s *nema, uint16_t steps){
+    int16_t a = 0;
+    if(nema->current_num_steps < 10000){
+        while(a < steps){
+            test_dir_fire(nema);
+            a++;
+        }
+    }
+}
+
+/*
 void motor_initilization(bjy48 *pins){
 
         printf("Initializing Coil Pins.\n");
@@ -127,6 +204,7 @@ void motor_initilization(bjy48 *pins){
 
     printf("GPIO Pins Initialized.\n");
 }
+
 
 void pattern_slice(bjy48 *set, bool direction){
 
@@ -293,6 +371,198 @@ while(!func_test){
 
   return func_test;
 }
+
+*/
+#endif
+
+
+#ifdef _nema_17
+
+//  This is the minimum step time the motor can handle
+#define minimum_step_uS 1.9
+//  this is intended to by used by pwm clk div
+// with a wrap of 20 and level of 5, this produces a 2.5us signal.
+#define minimum_clk_div 60 
+#define minimum_wrap_val 20
+#define minimum_level_val 5
+
+
+typedef struct nema_motor_driver_pin_s {
+    
+  uint8_t step;
+  uint8_t direction;
+  uint8_t fault;
+  uint8_t fan1;
+  uint8_t fan2;
+
+}nema_pins;
+
+
+typedef struct nema17_pwm_config_s {
+
+    pwm_config motor;
+    uint8_t slice;
+    uint8_t channel;
+    uint8_t init_clk_div;
+    uint16_t init_wrap;
+    uint16_t init_level;
+    
+}nema_pwm;
+
+
+typedef struct nema17_info {
+
+    //  holds the gpio pins
+    nema_pins n_pins;
+    // pwm configuration
+    nema_pwm pwm_cfg;
+
+    double motor_temp;
+    double drv_temp;
+
+    bool motor_direction;
+    volatile bool fan1_status;
+    volatile bool fan2_status;
+    //  this is active low, i believe.
+    bool fault_status;
+    uint16_t max_motor_temp;
+    uint16_t max_drv_temp;
+    uint8_t max_clk_div;
+
+}nema_info;
+
+
+void initialize_nema17_pwm(nema_info *set){
+
+    set->pwm_cfg.slice = pwm_gpio_to_slice_num(set->n_pins.step);
+    set->pwm_cfg.channel = pwm_gpio_to_channel(set->n_pins.step);
+    set->pwm_cfg.motor = pwm_get_default_config();
+    pwm_config_set_clkdiv_int(&set->pwm_cfg.motor, set->pwm_cfg.init_clk_div);
+    pwm_config_set_wrap(&set->pwm_cfg.motor, set->pwm_cfg.init_wrap);
+    pwm_init(set->pwm_cfg.slice, &set->pwm_cfg.motor, true);
+    pwm_set_chan_level(set->pwm_cfg.slice, set->pwm_cfg.channel, set->pwm_cfg.init_level);
+    pwm_set_enabled(set->pwm_cfg.slice, true);
+
+}
+
+//  Helper function to set new nema wrap value
+void set_new_nema_wrap(nema_info *set, uint16_t n_wrap){
+    pwm_set_wrap(set->pwm_cfg.slice, n_wrap);
+}
+
+// Helper function to set new nema levels
+void set_new_nema_level(nema_info *set, uint16_t n_level){
+    pwm_set_chan_level(set->pwm_cfg.slice, set->pwm_cfg.channel, n_level);
+}
+
+//  Helper function to set new nema clkdiv
+void set_new_nema_clkdiv(nema_info *set, uint8_t n_clkdiv){
+    pwm_set_enabled(set->pwm_cfg.slice, false);
+        pwm_set_clkdiv(set->pwm_cfg.slice, n_clkdiv);
+    pwm_set_enabled(set->pwm_cfg.slice, true);
+}
+
+
+void initialize_nema17_pins(nema_info *set){
+
+    gpio_init(set->n_pins.step);
+    gpio_init(set->n_pins.direction);
+    gpio_init(set->n_pins.fault);
+    gpio_init(set->n_pins.fan1);
+    gpio_init(set->n_pins.fan2);
+
+    gpio_set_function(set->n_pins.step, GPIO_FUNC_PWM);
+    gpio_set_function(set->n_pins.direction, GPIO_OUT);
+    gpio_set_function(set->n_pins.fault, GPIO_IN);
+    gpio_pull_up(set->n_pins.fault);
+    gpio_set_function(set->n_pins.fan1, GPIO_OUT);
+    gpio_set_function(set->n_pins.fan2, GPIO_OUT);
+
+    // test fan2 pin
+    gpio_put(set->n_pins.fan2, true);
+
+    initialize_nema17_pwm(set);
+
+}
+
+
+// checks if current motor temp is below max motor temp, if not, disable pwm until it is within range.
+void motor_temp_check(nema_info *set){
+    // percent motor temp of max
+    set->motor_temp = ((set->motor_temp / set->max_motor_temp) * 100);
+    printf("Motor Temp of Max: %.1f%c\n\n", set->motor_temp, '%');
+
+    if(set->motor_temp > 25 && set->motor_temp < 50){
+        printf("\tMotor Temp Surpassing 25%c Heat Rating.\n\n", '%');
+    }else if(set->motor_temp > 50.00 && set->motor_temp < 75){
+        printf("\tMotor Temp Surpassing 50%c Heat Rating.\n\n", '%');
+    }else if(set->motor_temp > 75.00 && set->motor_temp < 85){
+        printf("\tMotor Temp Surpassing 75%c Heat Rating.\n\n", '%');
+    }else if(set->motor_temp > 87.5){
+        printf("\t\tMotor Temp Reached Unsafe Operating Temps, cutting to prevent damage.\n");
+        pwm_set_enabled(set->pwm_cfg.slice, false);
+    }else{
+    //    printf("Motor Operating within nominal temps.\n\n");
+    }
+
+}
+
+
+void drv_temp_check(nema_info *set){
+    // percent motor temp of max
+    set->drv_temp = ((set->drv_temp / set->max_drv_temp) * 100);
+        printf("DRV Temp of Max: %.1f%c\n\n", set->drv_temp, '%');
+    if(set->drv_temp > 25.00 && set->drv_temp < 55.00){
+        set->fan1_status = true;
+    //    printf("Fan 1: Active\n");
+    }else{
+        set->fan1_status = false;
+    }
+
+    if(set->drv_temp > 50.00 && set->drv_temp < 75.00){
+        set->fan2_status = true;
+    //    printf("Fan 2: Active.\n");
+    }else{
+        set->fan2_status = false;
+    }
+
+
+    if(set->drv_temp > 83.3){
+        printf("DRV8825 Temp Reached Unsafe Operating Temps, Cut Power to prevent damage.\n");
+    }
+
+}
+
+
+void poll_nema_setup_temps(nema_info *set){
+    motor_temp_check(set);
+    drv_temp_check(set);
+}
+
+
+void update_fan_status(nema_info *set){
+    poll_nema_setup_temps(set);
+    gpio_put(set->n_pins.fan1, set->fan1_status);
+    gpio_put(set->n_pins.fan2, set->fan2_status);
+}
+
+
+//  When we go to use this in out project, we want this to be an interrupt.
+//  This pin is active low when set
+void update_fault_status(nema_info *set){
+    if(gpio_get(set->n_pins.fault)){
+        set->fault_status = true;
+    }else{
+        set->fault_status = false;
+    }
+}
+
+
+void update_motor_direction(nema_info *set, bool dir){
+    set->motor_direction = dir;
+    gpio_put(set->n_pins.direction, dir);
+}
+
 #endif
 
 #endif
